@@ -31,12 +31,31 @@ class Docker:
     def RUN(self, x):
         docker_file = self.docker_file
         ansible_file = self.ansible_file
+
+        #Determine name field in ansible
         if x > 0 and docker_file[x-1] != '' and docker_file[x-1][0] == '#':
             ansible_file.append('- name: ' + docker_file[x-1][1:])
-            ansible_file.append('  shell: ' + docker_file[x][3:].strip())
         else:
             ansible_file.append('- name: Run Command')
-            ansible_file.append('  shell: ' + docker_file[x][3:].strip())
+
+        #Account for backslashes to continue RUN command across new lines
+        line = ''
+        while True:
+            line_split = docker_file[x].split()
+
+            if line_split[0] == 'RUN': #Remove RUN from split
+                line_split = line_split[1:]
+
+            if line_split[len(line_split)-1] == '\\': #Has backslash
+                line += ' '.join(line_split[:len(line_split)-1]) + ' '
+                x += 1
+            else: #End of a statement
+                line += ' '.join(line_split)
+                break
+
+        ansible_file.append('  shell: ' + line)
+        ansible_file.append('') #add new line after command
+
 
 class Ansible:
     def __init__(self, ansible_array):
