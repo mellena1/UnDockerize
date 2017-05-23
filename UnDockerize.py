@@ -31,8 +31,8 @@ class Docker:
     def RUN(self, x):
         docker_file = self.docker_file
         ansible_file = self.ansible_file
-        if x > 0 and docker_file[x-1][0] == '#':
-            ansible_file.append('- name: ' + docker_file[x-1])
+        if x > 0 and docker_file[x-1] != '' and docker_file[x-1][0] == '#':
+            ansible_file.append('- name: ' + docker_file[x-1][1:])
             ansible_file.append('  shell: ' + docker_file[x][3:].strip())
         else:
             ansible_file.append('- name: Run Command')
@@ -46,12 +46,17 @@ class Ansible:
         #remove .yml if it was included
         if file_name[len(file_name)-4:] == '.yml':
             file_name = file_name[:len(file_name)-4]
-        #with open(file_name + '.yml', 'w') as f:
-
+        #write the ansible array to the file
+        with open(file_name + '.yml', 'w') as f:
+            for line in self.ansible:
+                f.write(line + '\n')
 
 
 #Main
 if __name__ == "__main__":
+    #command-line argument stuff
+    #-i for input file
+    #-o for output file
     argparser = argparse.ArgumentParser(description='Convert a Dockerfile to Ansible code')
     argparser.add_argument('-i', nargs=1, default=['Dockerfile'], type=str, metavar='input_file', help='The input (Dockerfile) file name; Default: Dockerfile')
     argparser.add_argument('-o', nargs=1, default=['unDockerized'], type=str, metavar='output_file', help='The output (Ansible) file name; Default: UnDockerized')
@@ -59,4 +64,5 @@ if __name__ == "__main__":
 
     docker_file = Docker(args['i'][0])
     docker_file.parse_docker()
-    print(docker_file.ansible_file)
+    ansible_file = Ansible(docker_file.ansible_file)
+    ansible_file.write_to_file(args['o'][0])

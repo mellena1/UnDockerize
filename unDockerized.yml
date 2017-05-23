@@ -1,0 +1,13 @@
+---
+- name:  Install composer
+  shell: curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
+- name:  Install package dependencies
+  shell: apt-get update && apt-get install -y \
+- name: apc is only available in a PECL install so yea
+  shell: pecl install apcu-4.0.11 \
+- name:  docker-ext-install isn't checking 64bit lib dir for this...
+  shell: ln -s /usr/include/x86_64-linux-gnu/gmp.h /usr/include/gmp.h
+- name: Run Command
+  shell: docker-php-ext-install \
+- name:    > Set remote_connect_back=0 below
+  shell: pecl install xdebug && \
