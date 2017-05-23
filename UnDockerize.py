@@ -16,7 +16,10 @@ class Docker:
         docker_file = self.docker_file
         #different cases for the docker file syntax
         cases = {
-                    'RUN' : self.RUN
+                    'RUN'   : self.RUN
+                    'LABEL' : self.LABEL
+                    'ENV'   : self.ENV
+                    'ADD'   : self.ADD
                 }
 
         #Check each line for command, run cooresponding function
@@ -67,6 +70,25 @@ class Docker:
         ansible_file.append('  shell: ' + line)
         ansible_file.append('') #add new line after command
 
+
+    #def LABEL(self, x):
+
+    #def ENV(self, x):
+    #    docker_file = self.docker_file
+    #    ansible_file = self.ansible_file
+    #    if x > 0 and docker_file[x - 1][0] == '#':
+    #        ansible_file.append('- name: ' + docker_file[x - 1][1:])
+    #        ansible_file.append('  shell: export ' + docker_file[x - 1][1] + ' ' + docker_file[x][1])
+
+    def ADD(self, x):
+        ocker_file = self.docker_file
+        ansible_file = self.ansible_file
+        if x > 0 and docker_file[x-1][0] == '#':
+            ansible_file.append('- name: ' + docker_file[x-1][1:])
+            ansible_file.append('cp ' + ' '.join(parsed[1:]))
+        else:
+            ansible_file.append('- name: Add command')
+            ansible_file.append('cp ' + ' '.join(parsed[1:]))
 
 class Ansible:
     def __init__(self, ansible_array):
