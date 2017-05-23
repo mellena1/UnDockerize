@@ -1,2 +1,2 @@
 # Dockerble
-Python script to convert Docker-compose code to Ansible code
+Python script to convert Dockerfile code to Ansible code
