@@ -32,11 +32,22 @@ class Docker:
         docker_file = self.docker_file
         ansible_file = self.ansible_file
 
-        #Determine name field in ansible
-        if x > 0 and docker_file[x-1] != '' and docker_file[x-1][0] == '#':
-            ansible_file.append('- name: ' + docker_file[x-1][1:])
-        else:
-            ansible_file.append('- name: Run Command')
+        #Include comments above the RUN command
+        y = x-1
+        comments = ''
+        while y >= 0:
+            line_split = docker_file[y].split()
+            if len(line_split) > 0 and line_split[0][0] == '#': #Comment line
+                comments += ' '.join(line_split) + '\n'
+                y -= 1
+            else: #No more comments
+                comments = comments[:len(comments)-1] #remove last \n
+                break
+
+        #append the comments and name
+        if comments != '':
+            ansible_file.append(comments)
+        ansible_file.append('- name: RUN')
 
         #Account for backslashes to continue RUN command across new lines
         line = ''
