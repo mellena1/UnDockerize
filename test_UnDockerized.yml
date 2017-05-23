@@ -1,0 +1,6 @@
+---
+- name: RUN
+  shell: cd ~/
+
+- name: ENV
+  shell: export PATH=blah HI=foo foo=bar fool=baff dsf=asffas
