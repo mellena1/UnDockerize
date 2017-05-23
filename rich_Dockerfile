@@ -1,0 +1,58 @@
+FROM ubuntu:16.04
+
+RUN mkdir /opt/oracle \
+    && mkdir /opt/src \
+    && mkdir /opt/python_stuff
+
+COPY docker_bin/* /opt/oracle/
+COPY Python_Stuff/* /opt/python_stuff/
+
+RUN apt-get update && apt-get install -y \
+    git \
+    libaio1 \
+    libldap2-dev \
+    libmysqlclient-dev \
+    libsasl2-dev \
+    libssl-dev \
+    libsoci-dev \
+    locales \
+    mysql-client \
+    python3 \
+    python3-pip \
+    python3-setuptools \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN cd /opt/oracle \
+    && unzip instantclient-basic-linux.*.zip \
+    && unzip instantclient-sdk-linux.*.zip \
+    && rm *.zip \
+    && cd instantclient_12_2 \
+    && ln -s libclntsh.so.12.1 libclntsh.so \
+    && ln -s libocci.so.12.1 libocci.so \
+    && locale-gen en_US.UTF-8
+
+ENV ORACLE_HOME=/opt/oracle/instantclient_12_2 \
+    VERSION=12.2.0.1.0 \
+    ARCH=x86_64 \
+    LD_LIBRARY_PATH=$ORACLE_HOME \
+    DYLD_LIBRARY_PATH=$ORACLE_HOME \
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
+
+WORKDIR /opt/python_stuff
+RUN pip3 install --upgrade pip \
+    && pip3 install cffi \
+    && pip3 install -r requirements_linux.txt \
+    && rm -rf /opt/python_stuf
+
+
+WORKDIR /opt/src
+RUN git config --global user.email "docker@localhost" \
+    && git config --global user.name "docker"
+
+EXPOSE 8000
+WORKDIR /opt/src
+ENTRYPOINT ["/opt/src/manage_docker.sh"]
+CMD ["help"]

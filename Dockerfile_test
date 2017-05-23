@@ -1,1 +1,7 @@
 RUN cd ~/
+
+ENV PATH blah \
+    HI foo \
+    foo=bar \
+    fool baff \
+    dsf=asffas
