@@ -34,12 +34,42 @@ class Docker:
     def RUN(self, x):
         docker_file = self.docker_file
         ansible_file = self.ansible_file
-        if x > 0 and docker_file[x-1] != '' and docker_file[x-1][0] == '#':
-            ansible_file.append('- name: ' + docker_file[x-1][1:])
-            ansible_file.append('  shell: ' + docker_file[x][3:].strip())
-        else:
-            ansible_file.append('- name: Run Command')
-            ansible_file.append('  shell: ' + docker_file[x][3:].strip())
+
+        #Include comments above the RUN command
+        y = x-1
+        comments = ''
+        while y >= 0:
+            line_split = docker_file[y].split()
+            if len(line_split) > 0 and line_split[0][0] == '#': #Comment line
+                comments += ' '.join(line_split) + '\n'
+                y -= 1
+            else: #No more comments
+                comments = comments[:len(comments)-1] #remove last \n
+                break
+
+        #append the comments and name
+        if comments != '':
+            ansible_file.append(comments)
+        ansible_file.append('- name: RUN')
+
+        #Account for backslashes to continue RUN command across new lines
+        line = ''
+        while True:
+            line_split = docker_file[x].split()
+
+            if line_split[0] == 'RUN': #Remove RUN from split
+                line_split = line_split[1:]
+
+            if line_split[len(line_split)-1] == '\\': #Has backslash
+                line += ' '.join(line_split[:len(line_split)-1]) + ' '
+                x += 1
+            else: #End of a statement
+                line += ' '.join(line_split)
+                break
+
+        ansible_file.append('  shell: ' + line)
+        ansible_file.append('') #add new line after command
+
 
     #def LABEL(self, x):
 

@@ -1,13 +1,29 @@
 ---
-- name:  Install composer
+# Install composer
+- name: RUN
   shell: curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
-- name:  Install package dependencies
-  shell: apt-get update && apt-get install -y \
-- name: apc is only available in a PECL install so yea
-  shell: pecl install apcu-4.0.11 \
-- name:  docker-ext-install isn't checking 64bit lib dir for this...
+
+# Install package dependencies
+- name: RUN
+  shell: apt-get update && apt-get install -y zlib1g zlib1g-dev git libmcrypt-dev libxml2-dev libgmp-dev libpcre3-dev php-apc libicu-dev
+
+#apc is only available in a PECL install so yea
+- name: RUN
+  shell: pecl install apcu-4.0.11 && echo extension=apcu.so > /usr/local/etc/php/conf.d/docker-php-ext-apcu.ini
+
+# docker-ext-install isn't checking 64bit lib dir for this...
+- name: RUN
   shell: ln -s /usr/include/x86_64-linux-gnu/gmp.h /usr/include/gmp.h
-- name: Run Command
-  shell: docker-php-ext-install \
-- name:    > Set remote_connect_back=0 below
-  shell: pecl install xdebug && \
+
+- name: RUN
+  shell: docker-php-ext-install mysql zip mcrypt soap mysqli gettext gmp sockets intl
+
+# > Set remote_connect_back=0 below
+# > sudo ifconfig lo0 alias 10.254.254.254
+# Workaround: Create an alias for your mac loopback interface
+# See https://forums.docker.com/t/ip-address-for-xdebug/10460/22
+# xdebug.remote_connect_back=1 is not working as expected on Docker for Mac
+# IMPORTANT NOTE:
+- name: RUN
+  shell: pecl install xdebug && echo "zend_extension = "`echo "<?php print ini_get('extension_dir');" |php`"/xdebug.so" >> /usr/local/etc/php/php.ini
+
