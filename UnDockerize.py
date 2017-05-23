@@ -53,14 +53,10 @@ class Ansible:
 #Main
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description='Convert a Dockerfile to Ansible code')
-    argparser.add_argument('-i', nargs=1, default='Dockerfile', type=str, metavar='input_file', help='The input (Dockerfile) file name; Default: Dockerfile')
-    argparser.add_argument('-o', nargs=1, default='unDockerized', type=str, metavar='output_file', help='The output (Ansible) file name; Default: UnDockerized')
-    argparser.print_help()
-    
+    argparser.add_argument('-i', nargs=1, default=['Dockerfile'], type=str, metavar='input_file', help='The input (Dockerfile) file name; Default: Dockerfile')
+    argparser.add_argument('-o', nargs=1, default=['unDockerized'], type=str, metavar='output_file', help='The output (Ansible) file name; Default: UnDockerized')
+    args = vars(argparser.parse_args())
 
-    # docker_file = Docker(sys.argv[2])
-    #
-    # else:
-    #     docker_file = Docker('Dockerfile')
-    # docker_file.parse_docker()
-    # print(docker_file.ansible_file)
+    docker_file = Docker(args['i'][0])
+    docker_file.parse_docker()
+    print(docker_file.ansible_file)
