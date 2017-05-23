@@ -31,8 +31,8 @@ class Docker:
     def RUN(self, x):
         docker_file = self.docker_file
         ansible_file = self.ansible_file
-        if x > 0 and docker_file[x-1][0] == '#':
-            ansible_file.append('- name: ' + docker_file[x-1])
+        if x > 0 and docker_file[x-1] != '' and docker_file[x-1][0] == '#':
+            ansible_file.append('- name: ' + docker_file[x-1][1:])
             ansible_file.append('  shell: ' + docker_file[x][3:].strip())
         else:
             ansible_file.append('- name: Run Command')
