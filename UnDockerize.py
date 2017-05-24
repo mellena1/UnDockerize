@@ -1,5 +1,6 @@
 import argparse
 import urlparse
+import os.path
 
 """
 Docker Class
@@ -223,11 +224,18 @@ if __name__ == "__main__":
     argparser.add_argument('-i', nargs=1, default=['Dockerfile'], type=str, metavar='input_file', help='The input (Dockerfile) file name; Default: Dockerfile')
     argparser.add_argument('-o', nargs=1, default=['unDockerized'], type=str, metavar='output_file', help='The output (Ansible) file name; Default: UnDockerized')
     args = vars(argparser.parse_args())
+    
+    input_file = args['i'][0]
+    output_file = args['o'][0]
 
     #Parse Docker
-    docker_file = Docker(args['i'][0])
-    docker_file.parse_docker()
+    if os.path.isfile(input_file):
+        docker_file = Docker(input_file)
+        docker_file.parse_docker()
+    else:
+        print('File "' + input_file + '" does not exist. Exiting...')
+        exit()
 
     #Write to Ansible
     ansible_file = Ansible(docker_file.ansible_file)
-    ansible_file.write_to_file(args['o'][0])
+    ansible_file.write_to_file(output_file)
