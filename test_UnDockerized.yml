@@ -1,6 +1,26 @@
 ---
-- name: RUN
+- name: Shell Command (cd ~/)
   shell: cd ~/
 
-- name: ENV
+- name: Set ENV vars: PATH HI foo fool dsf
   shell: export PATH=blah HI=foo foo=bar fool=baff dsf=asffas
+
+- name: Copy file from https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml
+  get_url:
+    url: https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml
+    dest: /
+
+- name: Unarchive /Foo/foo.tar
+  shell: tar -x /Foo/foo.tar /
+
+- name: Unarchive /Foo/foo.gz
+  shell: tar -x /Foo/foo.gz /
+
+- name: Unarchive /Foo/foo.bz2
+  shell: tar -x /Foo/foo.bz2 /
+
+- name: Unarchive /Foo/foo.xz
+  shell: tar -x /Foo/foo.xz /
+
+- name: Copy /Foo to /foo/foo
+  shell: cp /Foo /foo/foo

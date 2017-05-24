@@ -1,4 +1,5 @@
 import argparse
+import urlparse
 
 """
 Docker Class
@@ -13,7 +14,7 @@ class Docker:
         self.ansible_file = ['---']
         self.work_dir = ''
         self.cases = { #different cases for the docker file syntax
-                        'ADD'     : self.COPY,
+                        'ADD'     : self.ADD,
                         'COPY'    : self.COPY,
                         'ENV'     : self.ENV,
                         'RUN'     : self.RUN,
@@ -42,6 +43,14 @@ class Docker:
         del self.ansible_file[-1] # remove the last \n
 
     """--------------------------COMMANDS---------------------------------"""
+    #Logic for an ADD command (Can copy, download from remote, or unarchive)
+    def ADD(self, x):
+        cmd = self.ADD_helper(x)
+        if cmd == '':
+            self.COPY(x)
+        else:
+            self.put_together(x, name=self.ADD_name_helper(cmd), cmd=cmd)
+
     #Logic for a COPY command (Copies file to another location)
     def COPY(self, x):
         cmd = '  shell: '+self.get_work_dir_cmd()
@@ -69,6 +78,27 @@ class Docker:
 
 
     """------------------COMMAND HELPER FUNCTIONS-------------------------"""
+    #Determines if you need to get from remote location,
+    #unarchive a tar, or just copy
+    def ADD_helper(self, x):
+        docker_file = self.docker_file
+
+        input_cmd = self.condense_multiline_cmds(x)
+        split_cmd = input_cmd.split()
+        if self.is_url(split_cmd[0]):
+            return '  get_url:\n    url: ' + split_cmd[0] + '\n    dest: ' + split_cmd[1]
+        elif self.is_tar(split_cmd[0]):
+            return '  shell: tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
+        else:
+            return ''
+
+    #Returns name based on if getting from url or unarchiving
+    def ADD_name_helper(self, cmd):
+        if cmd.split()[0] == 'get_url:':
+            return 'Copy file from ' + cmd.split()[2]
+        else:
+            return 'Unarchive ' + cmd.split()[3]
+
     #Takes all comments from y up and appends them (Usually pass x-1)
     def comments(self, y):
         docker_file = self.docker_file
@@ -107,6 +137,7 @@ class Docker:
                 break
         return line
 
+    #Returns name with the src and dest in title
     def COPY_name_helper(self, cmd):
         split_cmd = cmd.split()
         src = split_cmd[len(split_cmd)-2:len(split_cmd)-1]
@@ -128,6 +159,7 @@ class Docker:
                 x += 1
         return ' '.join(output)
 
+    #Returns name with all ENV vars in title
     def ENV_name_helper(self, env_vars):
         env_var_names = []
         for vals in env_vars.split():
@@ -141,6 +173,15 @@ class Docker:
             return 'cd ' + work_dir + ' && '
         else:
             return ''
+
+    #Return true if _file is a tar archive. Can only go by file name
+    def is_tar(self, _file):
+        extensions = {'.tar', '.gz', '.bz2', '.xz'}
+        return _file[len(_file)-4:] in extensions or _file[len(_file)-3:] in extensions
+
+    #Determines if an input is a url
+    def is_url(self, url):
+        return urlparse.urlparse(url).scheme != ""
 
     #The common stuff of every command
     #Adds the comments above, then the name and
