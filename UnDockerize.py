@@ -79,12 +79,15 @@ class Docker:
         docker_file = self.docker_file
 
         line = ''
-        while True:
+        while True: #breaks after there are no more escaped new lines
             line_split = docker_file[x].split()
             if line_split[0] in self.cases: #Remove cases from split
                 line_split = line_split[1:]
-            if line_split[len(line_split)-1] == '\\': #Has backslash
-                line += ' '.join(line_split[:len(line_split)-1]) + ' '
+            if '#' in line_split[0]: #ignore comments
+                x += 1
+            elif line_split[len(line_split)-1] == '\\': #Has backslash
+                if len(line_split) > 1: #Only add if there is more than just a backslash
+                    line += ' '.join(line_split[:len(line_split)-1]) + ' '
                 x += 1
             else: #End of a statement
                 line += ' '.join(line_split)
