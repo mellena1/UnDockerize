@@ -24,5 +24,5 @@ UnDockerize can currently handle a lot of the built in Dockerfile commands and a
 * **WORKDIR** - Changes the working directory for all following commands.
 
 ## Other features
-* Auto-naming: UnDockerize does its best to provide each Ansible task with a relevant name to what is being done.
-* Comments: UnDockerize includes all trailing comments behind a valid command.
+* **Auto-naming**: UnDockerize does its best to provide each Ansible task with a relevant name to what is being done.
+* **Comments**: UnDockerize includes all trailing comments behind a valid command.
