@@ -1,6 +1,9 @@
 import argparse
 import urlparse
 import os.path
+import urllib
+import shutil
+from subprocess import call as subprocess_call, PIPE
 
 """
 Docker Class
@@ -14,6 +17,7 @@ class Docker:
         self.docker_file = []
         self.ansible_file = ['---']
         self.work_dir = ''
+        self.FROM = ''
         self.cases = { #different cases for the docker file syntax
                         'ADD'     : self.ADD,
                         'COPY'    : self.COPY,
@@ -24,7 +28,11 @@ class Docker:
         #Read the file in and put the lines in the docker_file array
         with open(file_name, 'r') as f:
             for line in f:
-                self.docker_file.append(line.strip())
+                line = line.strip()
+                self.docker_file.append(line)
+                split_line = line.split()
+                if len(split_line) > 0 and split_line[0] == 'FROM':
+                    self.FROM = line
 
     #Parses each line of docker to return the ansible file array
     def parse_docker(self):
@@ -216,6 +224,50 @@ class Ansible:
                 f.write(line + '\n')
 
 
+"""-------------------------------------FROM STUFF------------------------------"""
+#Recursively go up the chain of turtles until an os image is found (no repo)
+def get_repos_with_FROM(FROM):
+    stripped_FROM = ''.join(FROM.split()[1:])
+    split_FROM = stripped_FROM.split(':')
+
+    repo = split_FROM[0]
+    dirs = split_FROM[1].split('-')
+    #Make a string to find the correct directory
+    dir_str = ''
+    for dir in dirs:
+        dir_str += '/'+dir
+
+    #Check if dir exists
+    link = 'https://github.com/docker-library/' + repo + '.git'
+    opened_url = urllib.urlopen(link)
+
+    if opened_url.getcode() != 404: #Must be an image if there is no repo there
+        repos.append(repo)
+
+        subprocess_call(['git', 'clone', link], stdout=PIPE,stderr=PIPE) #clone the repo
+
+        dependencies_copy(repo, dir_str)
+
+        docker_files.append(Docker(repo + dir_str + '/Dockerfile')) #instantiate a new Docker
+        get_repos_with_FROM(docker_files[-1].FROM) #recursively call on next FROM statement
+    else: #Print the image that docker used
+        print('Docker used image:\n        ' + stripped_FROM)
+
+#Copies the parent folder of the Dockerfile into
+#   the Dependencies directory
+def dependencies_copy(repo, dir_str):
+    dependencies_repo_dir = 'Dependencies/' + repo
+    if os.path.isdir(dependencies_repo_dir): #Delete the old dir
+        shutil.rmtree(dependencies_repo_dir)
+    shutil.copytree(repo + dir_str, dependencies_repo_dir) #Make copy of important dir for user
+
+#Gets rid of all of the repos that were downloaded
+def remove_all_repos():
+    for repo in repos:
+        shutil.rmtree(repo)
+
+
+"""--------------------------------MAIN------------------------------------------"""
 #Main function
 if __name__ == "__main__":
     #command-line argument stuff
@@ -229,14 +281,29 @@ if __name__ == "__main__":
     input_file = args['i'][0]
     output_file = args['o'][0]
 
-    #Parse Docker
+    docker_files = []
+    repos = []
+
+    #Parse input Dockerfile
     if os.path.isfile(input_file):
-        docker_file = Docker(input_file)
-        docker_file.parse_docker()
+        docker_files.append(Docker(input_file))
     else:
         print('File "' + input_file + '" does not exist. Exiting...')
         exit()
 
-    #Write to Ansible
-    ansible_file = Ansible(docker_file.ansible_file)
-    ansible_file.write_to_file(output_file)
+    #Recursively get all the repos from FROM statements
+    get_repos_with_FROM(docker_files[0].FROM)
+
+    #Write all of the ansible files
+    for x in range(0, len(docker_files)):
+        docker_file = docker_files[x]
+        docker_file.parse_docker()
+        ansible_file = Ansible(docker_file.ansible_file)
+        if x == 0:
+            file_name = output_file
+        else:
+            file_name = 'Dependencies/' + repos[x-1] + '/' + repos[x-1] #input not included (docker_files[0])
+        ansible_file.write_to_file(file_name)
+
+    #Get rid of all the cloned git repos
+    remove_all_repos()
