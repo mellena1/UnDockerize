@@ -11,11 +11,13 @@ class Docker:
         #instance vars
         self.docker_file = []
         self.ansible_file = ['---']
+        self.work_dir = ''
         self.cases = { #different cases for the docker file syntax
-                        'ADD'   : self.COPY,
-                        'COPY'  : self.COPY,
-                        'ENV'   : self.ENV,
-                        'RUN'   : self.RUN
+                        'ADD'     : self.COPY,
+                        'COPY'    : self.COPY,
+                        'ENV'     : self.ENV,
+                        'RUN'     : self.RUN,
+                        'WORKDIR' : self.WORKDIR
                      }
         #Read the file in and put the lines in the docker_file array
         with open(file_name, 'r') as f:
@@ -35,24 +37,32 @@ class Docker:
                 command = line_split[0]
                 if command in cases:
                     cases[command](x)
-                    ansible_file.append('') #add new line after command
+                    if command != 'WORKDIR': #WORKDIR doesn't append anything
+                        ansible_file.append('') #add new line after command
         del self.ansible_file[-1] # remove the last \n
 
     """--------------------------COMMANDS---------------------------------"""
     #Logic for a COPY command (Copies file to another location)
     def COPY(self, x):
-        cmd = '  shell: cp '+self.condense_multiline_cmds(x)
-        put_together(x, name='ADD', cmd)
+        cmd = '  shell: '+self.get_work_dir_cmd()
+        cmd += 'cp '+self.condense_multiline_cmds(x)
+        self.put_together(x, name='COPY', cmd=cmd)
 
     #Logic for a ENV command (Sets environment variables)
     def ENV(self, x):
         cmd = '  shell: export '+self.ENV_helper(self.condense_multiline_cmds(x))
-        put_together(x, name='ENV', cmd)
+        self.put_together(x, name='ENV', cmd=cmd)
 
     #Logic for a RUN command (Shell command)
     def RUN(self, x):
-        cmd='  shell: ' + self.condense_multiline_cmds(x)
-        put_together(x, name='RUN', cmd)
+        cmd = '  shell: '+self.get_work_dir_cmd()
+        cmd += self.condense_multiline_cmds(x)
+        self.put_together(x, name='RUN', cmd=cmd)
+
+    #Logic for a WORKDIR command (change dir for next commands)
+    #Works for RUN, CMD, ENTRYPOINT, COPY, ADD
+    def WORKDIR(self, x):
+        self.work_dir = self.docker_file[x].split()[1]
 
 
     """------------------COMMAND HELPER FUNCTIONS-------------------------"""
@@ -108,6 +118,14 @@ class Docker:
                 output.append(line[x])
                 x += 1
         return ' '.join(output)
+
+    #Returns either '' or 'cd work_dir && '
+    def get_work_dir_cmd(self):
+        work_dir = self.work_dir
+        if work_dir != '':
+            return 'cd ' + work_dir + ' && '
+        else:
+            return ''
 
     #The common stuff of every command
     #Adds the comments above, then the name and
