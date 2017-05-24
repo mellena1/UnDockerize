@@ -2,10 +2,10 @@
 - name: RUN
   shell: mkdir /opt/oracle && mkdir /opt/src && mkdir /opt/python_stuff
 
-- name: ADD
+- name: COPY
   shell: cp docker_bin/* /opt/oracle/
 
-- name: ADD
+- name: COPY
   shell: cp Python_Stuff/* /opt/python_stuff/
 
 - name: RUN
@@ -18,7 +18,7 @@
   shell: export ORACLE_HOME=/opt/oracle/instantclient_12_2 VERSION=12.2.0.1.0 ARCH=x86_64 LD_LIBRARY_PATH=$ORACLE_HOME DYLD_LIBRARY_PATH=$ORACLE_HOME LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 
 - name: RUN
-  shell: pip3 install --upgrade pip && pip3 install cffi && pip3 install -r requirements_linux.txt && rm -rf /opt/python_stuf
+  shell: cd /opt/python_stuff && pip3 install --upgrade pip && pip3 install cffi && pip3 install -r requirements_linux.txt && rm -rf /opt/python_stuf
 
 - name: RUN
-  shell: git config --global user.email "docker@localhost" && git config --global user.name "docker"
+  shell: cd /opt/src && git config --global user.email "docker@localhost" && git config --global user.name "docker"
