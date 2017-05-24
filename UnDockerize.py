@@ -60,9 +60,9 @@ class Docker:
 
     #Logic for a ENV command (Sets environment variables)
     def ENV(self, x):
-        env_vars = self.ENV_helper(self.condense_multiline_cmds(x))
+        env_vars, spaced = self.ENV_helper(self.condense_multiline_cmds(x))
         cmd = '  shell: export '+env_vars
-        self.put_together(x, name=self.ENV_name_helper(env_vars), cmd=cmd)
+        self.put_together(x, name=self.ENV_name_helper(env_vars, spaced), cmd=cmd)
 
     #Logic for a RUN command (Shell command)
     def RUN(self, x):
@@ -149,23 +149,23 @@ class Docker:
     #ENV allows for either ENV VAR=val or ENV VAR val
     #Change format to VAR=val for ansible
     def ENV_helper(self, line):
-        line = line.split()
-        output = []
-        x = 0
-        while x < len(line):
-            if '=' not in line[x]:
-                output.append(line[x] + '=' + line[x+1])
-                x += 2
-            else:
-                output.append(line[x])
-                x += 1
-        return ' '.join(output)
+        line_split = line.split()
+
+        if '=' not in line_split[0]: #Space assignment export FOO="foo bar"
+            return ''.join(line_split[0] + '="' + ' '.join(line_split[1:]) + '"'), True
+        else: #equals assignment, already good
+            return line, False
 
     #Returns name with all ENV vars in title
-    def ENV_name_helper(self, env_vars):
+    def ENV_name_helper(self, env_vars, spaced):
         env_var_names = []
-        for vals in env_vars.split():
-            env_var_names.append(vals.split('=')[0])
+        env_vars_split = env_vars.split()
+
+        if spaced: #Only one ENV var being set
+            env_var_names.append(env_vars_split[0].split('=')[0])
+        else:
+            for vals in env_vars_split:
+                env_var_names.append(vals.split('=')[0])
         return 'Set ENV vars- ' + ' '.join(env_var_names)
 
     #Returns either '' or 'cd work_dir && '
