@@ -1,24 +1,24 @@
 ---
-- name: RUN
+- name: Shell Command (mkdir /opt/oracle)
   shell: mkdir /opt/oracle && mkdir /opt/src && mkdir /opt/python_stuff
 
-- name: COPY
+- name: Copy docker_bin/* to /opt/oracle/
   shell: cp docker_bin/* /opt/oracle/
 
-- name: COPY
+- name: Copy Python_Stuff/* to /opt/python_stuff/
   shell: cp Python_Stuff/* /opt/python_stuff/
 
-- name: RUN
+- name: Shell Command (apt-get update)
   shell: apt-get update && apt-get install -y git libaio1 libldap2-dev libmysqlclient-dev libsasl2-dev libssl-dev libsoci-dev locales mysql-client python3 python3-pip python3-setuptools unzip && rm -rf /var/lib/apt/lists/*
 
-- name: RUN
+- name: Shell Command (cd /opt/oracle)
   shell: cd /opt/oracle && unzip instantclient-basic-linux.*.zip && unzip instantclient-sdk-linux.*.zip && rm *.zip && cd instantclient_12_2 && ln -s libclntsh.so.12.1 libclntsh.so && ln -s libocci.so.12.1 libocci.so && locale-gen en_US.UTF-8
 
-- name: ENV
+- name: Set ENV vars: ORACLE_HOME VERSION ARCH LD_LIBRARY_PATH DYLD_LIBRARY_PATH LANG LANGUAGE LC_ALL
   shell: export ORACLE_HOME=/opt/oracle/instantclient_12_2 VERSION=12.2.0.1.0 ARCH=x86_64 LD_LIBRARY_PATH=$ORACLE_HOME DYLD_LIBRARY_PATH=$ORACLE_HOME LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 
-- name: RUN
+- name: Shell Command (pip3 install)
   shell: cd /opt/python_stuff && pip3 install --upgrade pip && pip3 install cffi && pip3 install -r requirements_linux.txt && rm -rf /opt/python_stuf
 
-- name: RUN
+- name: Shell Command (git config)
   shell: cd /opt/src && git config --global user.email "docker@localhost" && git config --global user.name "docker"

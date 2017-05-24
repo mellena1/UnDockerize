@@ -46,18 +46,21 @@ class Docker:
     def COPY(self, x):
         cmd = '  shell: '+self.get_work_dir_cmd()
         cmd += 'cp '+self.condense_multiline_cmds(x)
-        self.put_together(x, name='COPY', cmd=cmd)
+        self.put_together(x, name=self.COPY_name_helper(cmd), cmd=cmd)
 
     #Logic for a ENV command (Sets environment variables)
     def ENV(self, x):
-        cmd = '  shell: export '+self.ENV_helper(self.condense_multiline_cmds(x))
-        self.put_together(x, name='ENV', cmd=cmd)
+        env_vars = self.ENV_helper(self.condense_multiline_cmds(x))
+        cmd = '  shell: export '+env_vars
+        self.put_together(x, name=self.ENV_name_helper(env_vars), cmd=cmd)
 
     #Logic for a RUN command (Shell command)
     def RUN(self, x):
         cmd = '  shell: '+self.get_work_dir_cmd()
-        cmd += self.condense_multiline_cmds(x)
-        self.put_together(x, name='RUN', cmd=cmd)
+        shell_cmd = self.condense_multiline_cmds(x)
+        cmd += shell_cmd
+        name = 'Shell Command (' + ' '.join(shell_cmd.split()[0:2]) + ')'
+        self.put_together(x, name=name, cmd=cmd)
 
     #Logic for a WORKDIR command (change dir for next commands)
     #Works for RUN, CMD, ENTRYPOINT, COPY, ADD
@@ -104,6 +107,12 @@ class Docker:
                 break
         return line
 
+    def COPY_name_helper(self, cmd):
+        split_cmd = cmd.split()
+        src = split_cmd[len(split_cmd)-2:len(split_cmd)-1]
+        dest = split_cmd[len(split_cmd)-1:]
+        return 'Copy ' + src[0] + ' to ' + dest[0]
+
     #ENV allows for either ENV VAR=val or ENV VAR val
     #Change format to VAR=val for ansible
     def ENV_helper(self, line):
@@ -118,6 +127,12 @@ class Docker:
                 output.append(line[x])
                 x += 1
         return ' '.join(output)
+
+    def ENV_name_helper(self, env_vars):
+        env_var_names = []
+        for vals in env_vars.split():
+            env_var_names.append(vals.split('=')[0])
+        return 'Set ENV vars: ' + ' '.join(env_var_names)
 
     #Returns either '' or 'cd work_dir && '
     def get_work_dir_cmd(self):
