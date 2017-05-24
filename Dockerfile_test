@@ -5,3 +5,10 @@ ENV PATH blah \
     foo=bar \
     fool baff \
     dsf=asffas
+
+ADD https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml /
+ADD /Foo/foo.tar /
+ADD /Foo/foo.gz /
+ADD /Foo/foo.bz2 /
+ADD /Foo/foo.xz /
+ADD /Foo /foo/foo
