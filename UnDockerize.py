@@ -103,6 +103,7 @@ class Docker:
     #Takes all comments from y up and appends them (Usually pass x-1)
     def comments(self, y):
         docker_file = self.docker_file
+        ansible_file = self.ansible_file
 
         #Include comments above the RUN command
         comments = ''
@@ -224,7 +225,7 @@ if __name__ == "__main__":
     argparser.add_argument('-i', nargs=1, default=['Dockerfile'], type=str, metavar='input_file', help='The input (Dockerfile) file name; Default: Dockerfile')
     argparser.add_argument('-o', nargs=1, default=['unDockerized'], type=str, metavar='output_file', help='The output (Ansible) file name; Default: UnDockerized')
     args = vars(argparser.parse_args())
-    
+
     input_file = args['i'][0]
     output_file = args['o'][0]
 
