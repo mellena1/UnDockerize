@@ -8,7 +8,7 @@ A Python script to convert a Dockerfile to an Ansible-Playbook
 `-o output_file specifies the output file name. Defaults to UnDockeried`
 
 ## Capabilities
-UnDockerize can currently handle a lot of the built in Dockerfile commands and automatically convert them into Ansible code.</br></br>
+UnDockerize can currently handle a lot of the built in Dockerfile commands and automatically convert them into Ansible code.
 
 ### Undockerize supports the following Dockerfile commands currently:
 * ADD - Including: pulling from remote locations, unarchiving tar files, and the normal COPY command.
