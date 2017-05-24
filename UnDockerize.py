@@ -166,7 +166,7 @@ class Docker:
         env_var_names = []
         for vals in env_vars.split():
             env_var_names.append(vals.split('=')[0])
-        return 'Set ENV vars: ' + ' '.join(env_var_names)
+        return 'Set ENV vars- ' + ' '.join(env_var_names)
 
     #Returns either '' or 'cd work_dir && '
     def get_work_dir_cmd(self):

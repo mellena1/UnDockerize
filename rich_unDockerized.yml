@@ -14,7 +14,7 @@
 - name: Shell Command (cd /opt/oracle)
   shell: cd /opt/oracle && unzip instantclient-basic-linux.*.zip && unzip instantclient-sdk-linux.*.zip && rm *.zip && cd instantclient_12_2 && ln -s libclntsh.so.12.1 libclntsh.so && ln -s libocci.so.12.1 libocci.so && locale-gen en_US.UTF-8
 
-- name: Set ENV vars: ORACLE_HOME VERSION ARCH LD_LIBRARY_PATH DYLD_LIBRARY_PATH LANG LANGUAGE LC_ALL
+- name: Set ENV vars- ORACLE_HOME VERSION ARCH LD_LIBRARY_PATH DYLD_LIBRARY_PATH LANG LANGUAGE LC_ALL
   shell: export ORACLE_HOME=/opt/oracle/instantclient_12_2 VERSION=12.2.0.1.0 ARCH=x86_64 LD_LIBRARY_PATH=$ORACLE_HOME DYLD_LIBRARY_PATH=$ORACLE_HOME LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 
 - name: Shell Command (pip3 install)

@@ -1,21 +1,21 @@
 ---
 # Install composer
-- name: RUN
+- name: Shell Command (curl -sS)
   shell: curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
 
 # Install package dependencies
-- name: RUN
+- name: Shell Command (apt-get update)
   shell: apt-get update && apt-get install -y zlib1g zlib1g-dev git libmcrypt-dev libxml2-dev libgmp-dev libpcre3-dev php-apc libicu-dev
 
 #apc is only available in a PECL install so yea
-- name: RUN
+- name: Shell Command (pecl install)
   shell: pecl install apcu-4.0.11 && echo extension=apcu.so > /usr/local/etc/php/conf.d/docker-php-ext-apcu.ini
 
 # docker-ext-install isn't checking 64bit lib dir for this...
-- name: RUN
+- name: Shell Command (ln -s)
   shell: ln -s /usr/include/x86_64-linux-gnu/gmp.h /usr/include/gmp.h
 
-- name: RUN
+- name: Shell Command (docker-php-ext-install mysql)
   shell: docker-php-ext-install mysql zip mcrypt soap mysqli gettext gmp sockets intl
 
 # > Set remote_connect_back=0 below
@@ -24,6 +24,5 @@
 # See https://forums.docker.com/t/ip-address-for-xdebug/10460/22
 # xdebug.remote_connect_back=1 is not working as expected on Docker for Mac
 # IMPORTANT NOTE:
-- name: RUN
+- name: Shell Command (pecl install)
   shell: pecl install xdebug && echo "zend_extension = "`echo "<?php print ini_get('extension_dir');" |php`"/xdebug.so" >> /usr/local/etc/php/php.ini
-
