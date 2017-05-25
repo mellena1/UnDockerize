@@ -62,7 +62,7 @@ class Docker:
 
     #Logic for a COPY command (Copies file to another location)
     def COPY(self, x):
-        cmd = '  shell: '+self.get_work_dir_cmd()
+        cmd = '  shell: . ~/.bashrc && '+self.get_work_dir_cmd()
         cmd += 'cp '+self.condense_multiline_cmds(x)
         self.put_together(x, name=self.COPY_name_helper(cmd), cmd=cmd)
 
@@ -74,7 +74,7 @@ class Docker:
 
     #Logic for a RUN command (Shell command)
     def RUN(self, x):
-        cmd = '  shell: '+self.get_work_dir_cmd()
+        cmd = '  shell: . ~/.bashrc && '+self.get_work_dir_cmd() #Source bashrc everytime for ENV vars
         shell_cmd = self.condense_multiline_cmds(x)
         cmd += shell_cmd
         name = 'Shell Command (' + ' '.join(shell_cmd.split()[0:2]) + ')'
@@ -97,7 +97,7 @@ class Docker:
         if self.is_url(split_cmd[0]):
             return '  get_url:\n    url: ' + split_cmd[0] + '\n    dest: ' + split_cmd[1]
         elif self.is_tar(split_cmd[0]):
-            return '  shell: tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
+            return '  shell: . ~/.bashrc && tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
         else:
             return ''
 
@@ -287,7 +287,19 @@ def make_ansible_dependecy_copy(repo_depend_dirs):
         ansible_file.append('  with_fileglob:')
         ansible_file.append('    - ' + _dir + '/*')
         ansible_file.append('')
+        for _, _, files in os.walk(_dir):
+            for _file in files:
+                dependecy_files.append(_file)
     del ansible_file[-1]
+    return ansible_file
+
+#Makes an ansible file that will delete all files copied in make_ansible_dependecy_copy
+def make_ansible_dependecy_destroy(dependecy_files):
+    ansible_file = ['---']
+    for _file in dependecy_files:
+        ansible_file.append('- name: rm ' + _file)
+        ansible_file.append('  shell: rm -f ' + _file)
+        ansible_file.append('')
     return ansible_file
 
 #Creates a role file (site.yml) given all of the tasks
@@ -326,6 +338,7 @@ if __name__ == "__main__":
     repo_versions = [] #Versions to store for yml file names
     repo_tasks = [] #Ansible task names to be used for roles
     repo_depend_dirs = [] #Actual dirs that include the version dirs of the dependencies
+    dependecy_files = [] #Holds the names of the files getting copied to the remote host
 
     #Parse input Dockerfile
     if os.path.isfile(input_file):
@@ -358,6 +371,10 @@ if __name__ == "__main__":
     ansible_dep_copy_file = Ansible(make_ansible_dependecy_copy(repo_depend_dirs))
     ansible_dep_copy_file.write_to_file('roles/deps_copy/tasks/main')
     repo_tasks.append('deps_copy')
+
+    ansible_deps_destroy_file = Ansible(make_ansible_dependecy_destroy(dependecy_files))
+    ansible_deps_destroy_file.write_to_file('roles/deps_destroy/tasks/main')
+    repo_tasks.insert(0, 'deps_destroy')
 
     #Make the site file
     repo_tasks.reverse()
