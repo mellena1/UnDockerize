@@ -218,11 +218,16 @@ class Ansible:
         #remove .yml if it was included
         if file_name[len(file_name)-4:] == '.yml':
             file_name = file_name[:len(file_name)-4]
+
+        #Make dirs if not a path
+        final_dir = '/'.join(file_name.split('/')[:-1])
+        if not os.path.isdir(final_dir) and final_dir != '':
+            os.makedirs(final_dir)
+
         #write the ansible array to the file
         with open(file_name + '.yml', 'w') as f:
             for line in self.ansible:
                 f.write(line + '\n')
-
 
 """-------------------------------------FROM STUFF------------------------------"""
 #Recursively go up the chain of turtles until an os image is found (no repo)
@@ -276,6 +281,14 @@ def remove_all_repos():
     for repo in repos:
         shutil.rmtree(repo)
 
+def make_ansible_role_file(repo_tasks):
+    ansible_role = ['---']
+    ansible_role.append('- hosts: all')
+    ansible_role.append('  roles:')
+    for repo_task in repo_tasks:
+        ansible_role.append('    - ' + repo_task)
+    return ansible_role
+
 
 """--------------------------------MAIN------------------------------------------"""
 #Main function
@@ -296,8 +309,8 @@ if __name__ == "__main__":
     docker_files = [] #Docker objects that are created
     repos = [] #Cloned Repo names
     repo_versions = [] #Versions to store for yml file names
-
-    repo_dirs = [] #Actual dirs that include the version dirs of repos
+    repo_tasks = [] #Ansible task names to be used for roles
+    repo_dirs = [] #Actual dirs that include the version dirs of the dependencies
 
     #Parse input Dockerfile
     if os.path.isfile(input_file):
@@ -314,11 +327,20 @@ if __name__ == "__main__":
         docker_file = docker_files[x]
         docker_file.parse_docker()
         ansible_file = Ansible(docker_file.ansible_file)
+
+        #Location and file name
         if x == 0:
-            file_name = output_file
+            repo_tasks.append(output_file)
+            file_name = 'roles/' + output_file + '/tasks/main'
         else:
-            file_name = dependencies_dir + repos[x-1] + repo_versions[x-1] #input not included (docker_files[0])
+            repo_task = repos[x-1] + repo_versions[x-1] #x-1: input not included (docker_files[0])
+            repo_tasks.append(repo_task)
+            file_name = 'roles/' + repo_task + '/tasks/main'
+
         ansible_file.write_to_file(file_name)
 
+    repo_tasks.reverse()
+    ansible_role_file = Ansible(make_ansible_role_file(repo_tasks))
+    ansible_role_file.write_to_file('site.yml')
     #Get rid of all the cloned git repos
     remove_all_repos()
