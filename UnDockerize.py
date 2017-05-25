@@ -69,7 +69,7 @@ class Docker:
     #Logic for a ENV command (Sets environment variables)
     def ENV(self, x):
         env_vars, spaced = self.ENV_helper(self.condense_multiline_cmds(x))
-        cmd = '  shell: export '+env_vars
+        cmd = """  lineinfile:\n    dest: ~/.bashrc\n    line: 'export """+env_vars+"'"
         self.put_together(x, name=self.ENV_name_helper(env_vars, spaced), cmd=cmd)
 
     #Logic for a RUN command (Shell command)
@@ -229,7 +229,22 @@ class Ansible:
             for line in self.ansible:
                 f.write(line + '\n')
 
+
 """-------------------------------------FROM STUFF------------------------------"""
+#Copies the parent folder of the Dockerfile into
+#   the Dependencies directory
+def dependencies_copy(repo, dir_str):
+    dependencies_repo_dir = dependencies_dir + repo + dir_str
+    repo_depend_dirs.append(dependencies_repo_dir) #Keep track of where everything is going
+
+    if os.path.isdir(dependencies_repo_dir): #Delete the old dir
+        shutil.rmtree(dependencies_repo_dir)
+    shutil.copytree(repo + dir_str, dependencies_repo_dir) #Make copy of important dir for user
+    #Delete all subdirs of other versions from Dependencies dir
+    for root, subdirs, _ in os.walk(dependencies_repo_dir):
+        for subdir in subdirs:
+            shutil.rmtree(root + '/' + subdir)
+
 #Recursively go up the chain of turtles until an os image is found (no repo)
 def get_repos_with_FROM(FROM):
     stripped_FROM = ''.join(FROM.split()[1:])
@@ -262,33 +277,33 @@ def get_repos_with_FROM(FROM):
     else: #Print the image that docker used
         print('Docker used image:\n        ' + stripped_FROM)
 
-#Copies the parent folder of the Dockerfile into
-#   the Dependencies directory
-def dependencies_copy(repo, dir_str):
-    dependencies_repo_dir = dependencies_dir + repo + dir_str
-    repo_dirs.append(dependencies_repo_dir) #Keep track of where everything is going
+#Makes an ansible file that will copy over all of the files in the dependencies dir
+def make_ansible_dependecy_copy(repo_depend_dirs):
+    ansible_file = ['---']
+    for _dir in repo_depend_dirs:
+        ansible_file.append('- copy:')
+        ansible_file.append('    src: "{{ item }}"')
+        ansible_file.append('    dest: ~/')
+        ansible_file.append('  with_fileglob:')
+        ansible_file.append('    - ' + _dir + '/*')
+        ansible_file.append('')
+    del ansible_file[-1]
+    return ansible_file
 
-    if os.path.isdir(dependencies_repo_dir): #Delete the old dir
-        shutil.rmtree(dependencies_repo_dir)
-    shutil.copytree(repo + dir_str, dependencies_repo_dir) #Make copy of important dir for user
-    #Delete all subdirs of other versions from Dependencies dir
-    for root, subdirs, _ in os.walk(dependencies_repo_dir):
-        for subdir in subdirs:
-            shutil.rmtree(root + '/' + subdir)
+#Creates a role file (site.yml) given all of the tasks
+def make_ansible_role_file(tasks):
+    ansible_role = ['---']
+    ansible_role.append('- hosts: all')
+    ansible_role.append('  become: yes')
+    ansible_role.append('  roles:')
+    for task in tasks:
+        ansible_role.append('    - ' + task)
+    return ansible_role
 
 #Gets rid of all of the repos that were downloaded
 def remove_all_repos():
     for repo in repos:
         shutil.rmtree(repo)
-
-def make_ansible_role_file(repo_tasks):
-    ansible_role = ['---']
-    ansible_role.append('- hosts: all')
-    ansible_role.append('  roles:')
-    for repo_task in repo_tasks:
-        ansible_role.append('    - ' + repo_task)
-    return ansible_role
-
 
 """--------------------------------MAIN------------------------------------------"""
 #Main function
@@ -310,7 +325,7 @@ if __name__ == "__main__":
     repos = [] #Cloned Repo names
     repo_versions = [] #Versions to store for yml file names
     repo_tasks = [] #Ansible task names to be used for roles
-    repo_dirs = [] #Actual dirs that include the version dirs of the dependencies
+    repo_depend_dirs = [] #Actual dirs that include the version dirs of the dependencies
 
     #Parse input Dockerfile
     if os.path.isfile(input_file):
@@ -339,8 +354,15 @@ if __name__ == "__main__":
 
         ansible_file.write_to_file(file_name)
 
+    #Ansible file to copy dependencies to remote host
+    ansible_dep_copy_file = Ansible(make_ansible_dependecy_copy(repo_depend_dirs))
+    ansible_dep_copy_file.write_to_file('roles/deps_copy/tasks/main')
+    repo_tasks.append('deps_copy')
+
+    #Make the site file
     repo_tasks.reverse()
     ansible_role_file = Ansible(make_ansible_role_file(repo_tasks))
     ansible_role_file.write_to_file('site.yml')
+
     #Get rid of all the cloned git repos
     remove_all_repos()

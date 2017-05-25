@@ -1,3 +1,4 @@
 *.yml
 Dockerfile*
 UnDock_Dependencies/
+*.retry
