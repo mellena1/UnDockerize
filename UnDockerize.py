@@ -234,15 +234,19 @@ def get_repos_with_FROM(FROM):
     dirs = split_FROM[1].split('-')
     #Make a string to find the correct directory
     dir_str = ''
+    version = ''
     for dir in dirs:
+        version += '_'+dir
         dir_str += '/'+dir
 
     #Check if dir exists
     link = 'https://github.com/docker-library/' + repo + '.git'
     opened_url = urllib.urlopen(link)
 
+    #Keep cloning repos until it finds on that is an image
     if opened_url.getcode() != 404: #Must be an image if there is no repo there
         repos.append(repo)
+        repo_versions.append(version)
 
         subprocess_call(['git', 'clone', link], stdout=PIPE,stderr=PIPE) #clone the repo
 
@@ -256,10 +260,16 @@ def get_repos_with_FROM(FROM):
 #Copies the parent folder of the Dockerfile into
 #   the Dependencies directory
 def dependencies_copy(repo, dir_str):
-    dependencies_repo_dir = 'Dependencies/' + repo
+    dependencies_repo_dir = dependencies_dir + repo + dir_str
+    repo_dirs.append(dependencies_repo_dir) #Keep track of where everything is going
+
     if os.path.isdir(dependencies_repo_dir): #Delete the old dir
         shutil.rmtree(dependencies_repo_dir)
     shutil.copytree(repo + dir_str, dependencies_repo_dir) #Make copy of important dir for user
+    #Delete all subdirs of other versions from Dependencies dir
+    for root, subdirs, _ in os.walk(dependencies_repo_dir):
+        for subdir in subdirs:
+            shutil.rmtree(root + '/' + subdir)
 
 #Gets rid of all of the repos that were downloaded
 def remove_all_repos():
@@ -281,8 +291,13 @@ if __name__ == "__main__":
     input_file = args['i'][0]
     output_file = args['o'][0]
 
-    docker_files = []
-    repos = []
+    dependencies_dir = 'UnDock_Dependencies/'
+
+    docker_files = [] #Docker objects that are created
+    repos = [] #Cloned Repo names
+    repo_versions = [] #Versions to store for yml file names
+
+    repo_dirs = [] #Actual dirs that include the version dirs of repos
 
     #Parse input Dockerfile
     if os.path.isfile(input_file):
@@ -302,7 +317,7 @@ if __name__ == "__main__":
         if x == 0:
             file_name = output_file
         else:
-            file_name = 'Dependencies/' + repos[x-1] + '/' + repos[x-1] #input not included (docker_files[0])
+            file_name = dependencies_dir + repos[x-1] + repo_versions[x-1] #input not included (docker_files[0])
         ansible_file.write_to_file(file_name)
 
     #Get rid of all the cloned git repos
