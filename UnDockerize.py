@@ -301,6 +301,7 @@ def make_ansible_dependecy_copy(repo_depend_dirs):
         ansible_file.append('- copy:')
         ansible_file.append('    src: "{{ item }}"')
         ansible_file.append('    dest: ~/')
+        ansible_file.append('    mode: 0755')
         ansible_file.append('  with_fileglob:')
         ansible_file.append('    - ' + _dir + '/*')
         ansible_file.append('')
