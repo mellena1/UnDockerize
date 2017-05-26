@@ -16,7 +16,7 @@ class Docker:
         #instance vars
         self.docker_file = []
         self.ansible_file = ['---']
-        self.work_dir = ''
+        self.work_dir = '~/'
         self.FROM = ''
         self.cases = { #different cases for the docker file syntax
                         'ADD'     : self.ADD,
@@ -312,7 +312,7 @@ def make_ansible_dependecy_destroy(dependecy_files):
     ansible_file = ['---']
     for _file in dependecy_files:
         ansible_file.append('- name: rm ' + _file)
-        ansible_file.append('  shell: rm -f ' + _file)
+        ansible_file.append('  shell: rm -f ~/' + _file)
         ansible_file.append('')
     return ansible_file
 
