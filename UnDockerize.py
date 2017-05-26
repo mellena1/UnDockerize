@@ -62,8 +62,9 @@ class Docker:
 
     #Logic for a COPY command (Copies file to another location)
     def COPY(self, x):
-        cmd = '  shell: . ~/.bashrc && '+self.get_work_dir_cmd()
-        cmd += 'cp '+self.condense_multiline_cmds(x)
+        cmd = '  shell: . ~/.bashrc; '+self.get_work_dir_cmd()
+        docker_cp_cmd = self.condense_multiline_cmds(x)
+        cmd += self.COPY_helper(docker_cp_cmd)
         self.put_together(x, name=self.COPY_name_helper(cmd), cmd=cmd)
 
     #Logic for a ENV command (Sets environment variables)
@@ -74,7 +75,7 @@ class Docker:
 
     #Logic for a RUN command (Shell command)
     def RUN(self, x):
-        cmd = '  shell: . ~/.bashrc && '+self.get_work_dir_cmd() #Source bashrc everytime for ENV vars
+        cmd = '  shell: . ~/.bashrc; '+self.get_work_dir_cmd() #Source bashrc everytime for ENV vars
         shell_cmd = self.condense_multiline_cmds(x)
         cmd += shell_cmd
         name = 'Shell Command (' + ' '.join(shell_cmd.split()[0:2]) + ')'
@@ -97,7 +98,7 @@ class Docker:
         if self.is_url(split_cmd[0]):
             return '  get_url:\n    url: ' + split_cmd[0] + '\n    dest: ' + split_cmd[1]
         elif self.is_tar(split_cmd[0]):
-            return '  shell: . ~/.bashrc && tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
+            return '  shell: . ~/.bashrc; tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
         else:
             return ''
 
@@ -147,6 +148,19 @@ class Docker:
                 break
         return line
 
+    #COPY allows for COPY <src> <src>... <dest>
+    #Checks for copying multiple files at once
+    def COPY_helper(self, docker_cp_cmd):
+        docker_cp_cmd_split = docker_cp_cmd.split()
+        cmd = ''
+        if len(docker_cp_cmd_split) > 2:
+            for src in docker_cp_cmd_split[:-1]:
+                cmd += 'cp ' + src + ' ' + docker_cp_cmd_split[-1] + '; '
+            cmd = cmd[:-2] #Remove '; '
+        else:
+            cmd += 'cp '+docker_cp_cmd
+        return cmd
+
     #Returns name with the src and dest in title
     def COPY_name_helper(self, cmd):
         split_cmd = cmd.split()
@@ -159,9 +173,9 @@ class Docker:
     def ENV_helper(self, line):
         line_split = line.split()
 
-        if '=' not in line_split[0]: #Space assignment export FOO="foo bar"
+        if '=' not in line_split[0]: #Space assignment, change to export FOO="foo bar"
             return ''.join(line_split[0] + '="' + ' '.join(line_split[1:]) + '"'), True
-        else: #equals assignment, already good
+        else: #uses ENV equals assignment, already good
             return line, False
 
     #Returns name with all ENV vars in title
@@ -372,12 +386,15 @@ if __name__ == "__main__":
     ansible_dep_copy_file.write_to_file('roles/deps_copy/tasks/main')
     repo_tasks.append('deps_copy')
 
+    #Want roles above this line to run in reverse order
+    repo_tasks.reverse()
+
+    #Ansible file to delete dependencies after the ansible roles are done
     ansible_deps_destroy_file = Ansible(make_ansible_dependecy_destroy(dependecy_files))
     ansible_deps_destroy_file.write_to_file('roles/deps_destroy/tasks/main')
-    repo_tasks.insert(0, 'deps_destroy')
+    repo_tasks.append('deps_destroy')
 
     #Make the site file
-    repo_tasks.reverse()
     ansible_role_file = Ansible(make_ansible_role_file(repo_tasks))
     ansible_role_file.write_to_file('site.yml')
 
