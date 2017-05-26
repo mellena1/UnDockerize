@@ -382,17 +382,19 @@ if __name__ == "__main__":
         ansible_file.write_to_file(file_name)
 
     #Ansible file to copy dependencies to remote host
-    ansible_dep_copy_file = Ansible(make_ansible_dependecy_copy(repo_depend_dirs))
-    ansible_dep_copy_file.write_to_file('roles/deps_copy/tasks/main')
-    repo_tasks.append('deps_copy')
+    if len(repo_depend_dirs) > 0:
+        ansible_dep_copy_file = Ansible(make_ansible_dependecy_copy(repo_depend_dirs))
+        ansible_dep_copy_file.write_to_file('roles/deps_copy/tasks/main')
+        repo_tasks.append('deps_copy')
 
     #Want roles above this line to run in reverse order
     repo_tasks.reverse()
 
     #Ansible file to delete dependencies after the ansible roles are done
-    ansible_deps_destroy_file = Ansible(make_ansible_dependecy_destroy(dependecy_files))
-    ansible_deps_destroy_file.write_to_file('roles/deps_destroy/tasks/main')
-    repo_tasks.append('deps_destroy')
+    if len(dependecy_files) > 0:
+        ansible_deps_destroy_file = Ansible(make_ansible_dependecy_destroy(dependecy_files))
+        ansible_deps_destroy_file.write_to_file('roles/deps_destroy/tasks/main')
+        repo_tasks.append('deps_destroy')
 
     #Make the site file
     ansible_role_file = Ansible(make_ansible_role_file(repo_tasks))
