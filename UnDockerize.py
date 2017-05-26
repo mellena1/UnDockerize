@@ -47,8 +47,7 @@ class Docker:
                 command = line_split[0]
                 if command in cases:
                     cases[command](x)
-                    if command != 'WORKDIR': #WORKDIR doesn't append anything
-                        ansible_file.append('') #add new line after command
+                    ansible_file.append('') #add new line after command
         del self.ansible_file[-1] # remove the last \n
 
     """--------------------------COMMANDS---------------------------------"""
@@ -84,7 +83,11 @@ class Docker:
     #Logic for a WORKDIR command (change dir for next commands)
     #Works for RUN, CMD, ENTRYPOINT, COPY, ADD
     def WORKDIR(self, x):
-        self.work_dir = self.docker_file[x].split()[1]
+        _dir = self.docker_file[x].split()[1]
+        self.work_dir = _dir
+        name = 'Working dir- ' + _dir
+        cmd = '  shell: mkdir -p ' + _dir
+        self.put_together(x, name=name, cmd=cmd)
 
 
     """------------------COMMAND HELPER FUNCTIONS-------------------------"""
