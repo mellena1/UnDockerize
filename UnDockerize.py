@@ -297,7 +297,7 @@ def get_repos_with_FROM(FROM):
 def make_ansible_config_file():
     with open('ansible.cfg', 'w') as f:
         f.write('[ssh_connection]\n')
-        f.write('ssh_args = -o ServerAliveInterval=100')
+        f.write('ssh_args = -o ServerAliveInterval=60 -o ServerAliveCountMax=60')
 
 #Makes an ansible file that will copy over all of the files in the dependencies dir
 def make_ansible_dependecy_copy(repo_depend_dirs):
@@ -348,7 +348,7 @@ if __name__ == "__main__":
     #-o for output file
     argparser = argparse.ArgumentParser(description='Convert a Dockerfile to Ansible code')
     argparser.add_argument('-i', nargs=1, default=['Dockerfile'], type=str, metavar='input_file', help='The input (Dockerfile) file name; Default: Dockerfile')
-    argparser.add_argument('-o', nargs=1, default=['UnDockerized'], type=str, metavar='output_file', help='The output (Ansible) file name; Default: UnDockerized')
+    argparser.add_argument('-o', nargs=1, default=['UnDockerized'], type=str, metavar='output_file', help='The output (Ansible) role name; Default: UnDockerized')
     args = vars(argparser.parse_args())
 
     input_file = args['i'][0]
@@ -414,3 +414,6 @@ if __name__ == "__main__":
 
     #Get rid of all the cloned git repos
     remove_all_repos()
+
+    #print ansible command to run the generated code
+    print('ansible-playbook site.yml -u <user> -i <host>,')
