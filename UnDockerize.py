@@ -77,7 +77,7 @@ class Docker:
         cmd = '  shell: . ~/.bashrc; '+self.get_work_dir_cmd() #Source bashrc everytime for ENV vars
         shell_cmd = self.condense_multiline_cmds(x)
         cmd += shell_cmd
-        name = 'Shell Command (' + ' '.join(shell_cmd.split()[0:2]) + ')'
+        name = 'Shell Command (' + ' '.join(shell_cmd.split()[0:5]) + ')'
         self.put_together(x, name=name, cmd=cmd)
 
     #Logic for a WORKDIR command (change dir for next commands)
@@ -294,6 +294,11 @@ def get_repos_with_FROM(FROM):
     else: #Print the image that docker used
         print('Docker used image:\n        ' + stripped_FROM)
 
+def make_ansible_config_file():
+    with open('ansible.cfg', 'w') as f:
+        f.write('[ssh_connection]\n')
+        f.write('ssh_args = -o ServerAliveInterval=100')
+
 #Makes an ansible file that will copy over all of the files in the dependencies dir
 def make_ansible_dependecy_copy(repo_depend_dirs):
     ansible_file = ['---']
@@ -403,6 +408,9 @@ if __name__ == "__main__":
     #Make the site file
     ansible_role_file = Ansible(make_ansible_role_file(repo_tasks))
     ansible_role_file.write_to_file('site.yml')
+
+    #Generates the ansible.cfg file for ssh timeout
+    make_ansible_config_file()
 
     #Get rid of all the cloned git repos
     remove_all_repos()
