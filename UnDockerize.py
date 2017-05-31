@@ -92,7 +92,7 @@ class Docker:
 
     """------------------COMMAND HELPER FUNCTIONS-------------------------"""
     #Determines if you need to get from remote location,
-    #unarchive a tar, or just copy
+    #   unarchive a tar, or just copy
     def ADD_helper(self, x):
         docker_file = self.docker_file
 
@@ -294,6 +294,7 @@ def get_repos_with_FROM(FROM):
     else: #Print the image that docker used
         print('Docker used image:\n        ' + stripped_FROM)
 
+#Makes a config file to make sure long commands don't time out the ssh connection
 def make_ansible_config_file():
     with open('ansible.cfg', 'w') as f:
         f.write('[ssh_connection]\n')
