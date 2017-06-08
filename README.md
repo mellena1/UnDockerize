@@ -40,7 +40,7 @@ UnDockerize can currently handle a lot of the built in Dockerfile commands and a
 ```
 FROM debian:jessie
 
-RUN cd ~/
+RUN rm foo
 
 ENV PATH=blah \
     HI=foo \
@@ -59,8 +59,8 @@ ADD Foo /foo/foo
 ### into this Ansible code:
 ```
 ---
-- name: Shell Command (cd ~/)
-  shell: cd ~/ && cd ~/
+- name: Shell Command (rm foo)
+  shell: cd ~/ && rm foo
 
 - name: Set ENV vars- PATH HI foo fool dsf
   lineinfile:
