@@ -253,9 +253,11 @@ Ansible Class
 Holds the ansible info and writes the array to the yml file
 """
 class Ansible:
+    #Instantiates Ansible object
     def __init__(self, ansible_array):
         self.ansible = ansible_array
 
+    #Writes self.ansible to a .yml Ansible file
     def write_to_file(self, file_name):
         #remove .yml if it was included
         if file_name[len(file_name)-4:] == '.yml':
