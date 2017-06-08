@@ -33,3 +33,62 @@ UnDockerize can currently handle a lot of the built in Dockerfile commands and a
 ## Other features
 * **Auto-naming**: UnDockerize does its best to provide each Ansible task with a relevant name to what is being done.
 * **Comments**: UnDockerize includes all trailing comments behind a valid command.
+
+
+## Example
+### This Dockerfile gets converted:
+```
+FROM debian:jessie
+
+RUN cd ~/
+
+ENV PATH=blah \
+    HI=foo \
+    foo=bar \
+    fool=baff \
+    dsf=asffas
+
+ADD https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml /
+ADD /Foo/foo.tar /
+ADD /Foo/foo.gz /
+ADD /Foo/foo.bz2 /
+ADD /Foo/foo.xz /
+ADD Foo /foo/foo
+```
+
+### into this Ansible code:
+```
+---
+- name: Shell Command (cd ~/)
+  shell: cd ~/ && cd ~/
+
+- name: Set ENV vars- PATH HI foo fool dsf
+  lineinfile:
+    dest: ~/.bashrc
+    line: 'export PATH=blah HI=foo foo=bar fool=baff dsf=asffas'
+
+- name: Copy file from https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml
+  get_url:
+    url: https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml
+    dest: /
+
+- name: Unarchive /Foo/foo.tar
+  shell: tar -x /Foo/foo.tar /
+
+- name: Unarchive /Foo/foo.gz
+  shell: tar -x /Foo/foo.gz /
+
+- name: Unarchive /Foo/foo.bz2
+  shell: tar -x /Foo/foo.bz2 /
+
+- name: Unarchive /Foo/foo.xz
+  shell: tar -x /Foo/foo.xz /
+
+- name: Copy Foo to /foo/foo
+  copy:
+    src: "{{item}}"
+    dest: /foo/foo
+    mode: 0744
+  with_fileglob:
+    - ./Foo
+```
