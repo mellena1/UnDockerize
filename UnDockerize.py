@@ -12,12 +12,13 @@ Holds the Docker file info and parses it all
 """
 class Docker:
     #Instantiates an array with all of the lines in the given docker file
-    def __init__(self, file_name):
+    def __init__(self, file_name, dir_str):
         #instance vars
         self.docker_file = []
         self.ansible_file = ['---']
         self.work_dir = '~/'
         self.FROM = ''
+        self.dir_str = dir_str
         self.cases = { #different cases for the docker file syntax
                         'ADD'     : self.ADD,
                         'COPY'    : self.COPY,
@@ -60,11 +61,24 @@ class Docker:
             self.put_together(x, name=self.ADD_name_helper(cmd), cmd=cmd)
 
     #Logic for a COPY command (Copies file to another location)
+    #Doesn't work with env vars right now
     def COPY(self, x):
-        cmd = '  shell: . ~/.bashrc; '+self.get_work_dir_cmd()
         docker_cp_cmd = self.condense_multiline_cmds(x)
-        cmd += self.COPY_helper(docker_cp_cmd)
-        self.put_together(x, name=self.COPY_name_helper(cmd), cmd=cmd)
+        srcs, dest = self.COPY_helper(docker_cp_cmd)
+        cmd =  '  copy:\n'
+        cmd += '    src: "{{item}}"\n'
+        cmd += '    dest: ' + dest + '\n'
+        cmd += '    mode: 0744\n'
+        cmd += '  with_fileglob:\n'
+        name = self.COPY_name_helper(srcs,dest)
+        for src in srcs: #add all sources to fileglob
+            if not os.path.isfile(src):
+                src = self.dir_str + '/' + src
+                if not os.path.isfile(src):
+                    print('WARNING: Possible copy issue at ' + name + ' with ' + src)
+            cmd += '    - ' + src + '\n'
+        cmd = cmd[:-1] #remove last \n
+        self.put_together(x, name=name, cmd=cmd)
 
     #Logic for a ENV command (Sets environment variables)
     def ENV(self, x):
@@ -74,8 +88,11 @@ class Docker:
 
     #Logic for a RUN command (Shell command)
     def RUN(self, x):
-        cmd = '  shell: . ~/.bashrc; '+self.get_work_dir_cmd() #Source bashrc everytime for ENV vars
         shell_cmd = self.condense_multiline_cmds(x)
+        if '$' in shell_cmd:
+            cmd = '  shell: . ~/.bashrc; '+self.get_work_dir_cmd() #Source bashrc if an env var is mentioned
+        else:
+            cmd = '  shell: '+self.get_work_dir_cmd()
         cmd += shell_cmd
         name = 'Shell Command (' + ' '.join(shell_cmd.split()[0:5]) + ')'
         self.put_together(x, name=name, cmd=cmd)
@@ -86,7 +103,10 @@ class Docker:
         _dir = self.docker_file[x].split()[1]
         self.work_dir = _dir
         name = 'Working dir- ' + _dir
-        cmd = '  shell: mkdir -p ' + _dir
+        if '$' in _dir: #cut down on bashrc calls
+            cmd = '  shell: . ~/.bashrc; mkdir -p ' + _dir
+        else:
+            cmd = '  shell: mkdir -p ' + _dir
         self.put_together(x, name=name, cmd=cmd)
 
 
@@ -101,7 +121,10 @@ class Docker:
         if self.is_url(split_cmd[0]):
             return '  get_url:\n    url: ' + split_cmd[0] + '\n    dest: ' + split_cmd[1]
         elif self.is_tar(split_cmd[0]):
-            return '  shell: . ~/.bashrc; tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
+            if '$' in input_cmd: #Cut down on bashrc calls
+                return '  shell: . ~/.bashrc; tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
+            else:
+                return '  shell: tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
         else:
             return ''
 
@@ -154,22 +177,24 @@ class Docker:
     #COPY allows for COPY <src> <src>... <dest>
     #Checks for copying multiple files at once
     def COPY_helper(self, docker_cp_cmd):
-        docker_cp_cmd_split = docker_cp_cmd.split()
-        cmd = ''
-        if len(docker_cp_cmd_split) > 2:
-            for src in docker_cp_cmd_split[:-1]:
-                cmd += 'cp ' + src + ' ' + docker_cp_cmd_split[-1] + '; '
-            cmd = cmd[:-2] #Remove '; '
-        else:
-            cmd += 'cp '+docker_cp_cmd
-        return cmd
+        docker_cp_cmd += ' ' #append space so that last arg is added
+        open_quote = False
+        word = ''
+        split_cmd = []
+
+        for char in docker_cp_cmd:
+            if char == '"':
+                open_quote =  not open_quote
+            if (not open_quote and char != ' ') and char != '"':
+                word+=char
+            if (not open_quote and char == ' '):
+                split_cmd.append(word)
+                word = ''
+        return split_cmd[:-1], split_cmd[-1]
 
     #Returns name with the src and dest in title
-    def COPY_name_helper(self, cmd):
-        split_cmd = cmd.split()
-        src = split_cmd[len(split_cmd)-2:len(split_cmd)-1]
-        dest = split_cmd[len(split_cmd)-1:]
-        return 'Copy ' + src[0] + ' to ' + dest[0]
+    def COPY_name_helper(self, srcs, dest):
+        return 'Copy ' + ' '.join(srcs) + ' to ' + dest
 
     #ENV allows for either ENV VAR=val or ENV VAR val
     #Change format to VAR=val for ansible
@@ -289,7 +314,7 @@ def get_repos_with_FROM(FROM):
 
         dependencies_copy(repo, dir_str)
 
-        docker_files.append(Docker(repo + dir_str + '/Dockerfile')) #instantiate a new Docker
+        docker_files.append(Docker(repo + dir_str + '/Dockerfile', dependencies_dir + repo + dir_str)) #instantiate a new Docker
         get_repos_with_FROM(docker_files[-1].FROM) #recursively call on next FROM statement
     else: #Print the image that docker used
         print('Docker used image:\n        ' + stripped_FROM)
@@ -299,32 +324,6 @@ def make_ansible_config_file():
     with open('ansible.cfg', 'w') as f:
         f.write('[ssh_connection]\n')
         f.write('ssh_args = -o ServerAliveInterval=60 -o ServerAliveCountMax=60')
-
-#Makes an ansible file that will copy over all of the files in the dependencies dir
-def make_ansible_dependecy_copy(repo_depend_dirs):
-    ansible_file = ['---']
-    for _dir in repo_depend_dirs:
-        ansible_file.append('- copy:')
-        ansible_file.append('    src: "{{ item }}"')
-        ansible_file.append('    dest: ~/')
-        ansible_file.append('    mode: 0755')
-        ansible_file.append('  with_fileglob:')
-        ansible_file.append('    - ' + _dir + '/*')
-        ansible_file.append('')
-        for _, _, files in os.walk(_dir):
-            for _file in files:
-                dependecy_files.append(_file)
-    del ansible_file[-1]
-    return ansible_file
-
-#Makes an ansible file that will delete all files copied in make_ansible_dependecy_copy
-def make_ansible_dependecy_destroy(dependecy_files):
-    ansible_file = ['---']
-    for _file in dependecy_files:
-        ansible_file.append('- name: rm ' + _file)
-        ansible_file.append('  shell: rm -f ~/' + _file)
-        ansible_file.append('')
-    return ansible_file
 
 #Creates a role file (site.yml) given all of the tasks
 def make_ansible_role_file(tasks):
@@ -366,7 +365,7 @@ if __name__ == "__main__":
 
     #Parse input Dockerfile
     if os.path.isfile(input_file):
-        docker_files.append(Docker(input_file))
+        docker_files.append(Docker(input_file, '.'))
     else:
         print('File "' + input_file + '" does not exist. Exiting...')
         exit()
@@ -391,20 +390,8 @@ if __name__ == "__main__":
 
         ansible_file.write_to_file(file_name)
 
-    #Ansible file to copy dependencies to remote host
-    if len(repo_depend_dirs) > 0:
-        ansible_dep_copy_file = Ansible(make_ansible_dependecy_copy(repo_depend_dirs))
-        ansible_dep_copy_file.write_to_file('roles/deps_copy/tasks/main')
-        repo_tasks.append('deps_copy')
-
     #Want roles above this line to run in reverse order
     repo_tasks.reverse()
-
-    #Ansible file to delete dependencies after the ansible roles are done
-    if len(dependecy_files) > 0:
-        ansible_deps_destroy_file = Ansible(make_ansible_dependecy_destroy(dependecy_files))
-        ansible_deps_destroy_file.write_to_file('roles/deps_destroy/tasks/main')
-        repo_tasks.append('deps_destroy')
 
     #Make the site file
     ansible_role_file = Ansible(make_ansible_role_file(repo_tasks))
