@@ -15,7 +15,7 @@ UnDockerize can currently handle a lot of the built in Dockerfile commands and a
 
   ***NOTE:*** Because the script can't check the actual files that the Ansible code will run over, the only way for it to check  for tar files is to check for the file extension. This means don't have files with .tar, .gz, .bz2, or .xz in them if they are not tar files or it will error when Ansible runs.
 
-* **COPY** - Copies a source file to a destination.
+* **COPY** - Copies a source file from the host to the remote ansible destination.
 
 * **ENV** - Sets environment variables.
 
