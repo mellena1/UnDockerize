@@ -1,2 +1,6 @@
 *.yml
 Dockerfile*
+UnDock_Dependencies/
+*.retry
+roles/
+*.cfg
