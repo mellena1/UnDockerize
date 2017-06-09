@@ -54,31 +54,31 @@ class Docker:
     """--------------------------COMMANDS---------------------------------"""
     #Logic for an ADD command (Can copy, download from remote, or unarchive)
     def ADD(self, x):
-        cmd = self.ADD_helper(x)
-        if cmd == '':
-            self.COPY(x)
+        cmd = self.condense_multiline_cmds(x)
+        if self.is_square_brackets(cmd):
+            srcs, dest = self.square_brackets_split(cmd)
         else:
-            self.put_together(x, name=self.ADD_name_helper(cmd), cmd=cmd)
+            split = cmd.split()
+            srcs = split[:-1]
+            dest = split[-1]
+
+        copies = []
+        for src in srcs:
+            cmd, _type = self.ADD_helper(src, dest)
+            self.put_together(x, name=self.ADD_name_helper(_type,src,dest), cmd=cmd)
 
     #Logic for a COPY command (Copies file to another location)
     #Doesn't work with env vars right now
     def COPY(self, x):
         docker_cp_cmd = self.condense_multiline_cmds(x)
-        srcs, dest = self.COPY_helper(docker_cp_cmd)
-        cmd =  '  copy:\n'
-        cmd += '    src: "{{item}}"\n'
-        cmd += '    dest: ' + dest + '\n'
-        cmd += '    mode: 0744\n'
-        cmd += '  with_fileglob:\n'
-        name = self.COPY_name_helper(srcs,dest)
-        for src in srcs: #add all sources to fileglob
-            if not os.path.isfile(src):
-                src = self.dir_str + '/' + src
-                if not os.path.isfile(src):
-                    print('WARNING: Possible copy issue at ' + name + ' with ' + src)
-            cmd += '    - ' + src + '\n'
-        cmd = cmd[:-1] #remove last \n
-        self.put_together(x, name=name, cmd=cmd)
+        if self.is_square_brackets(docker_cp_cmd):
+            srcs, dest = self.square_brackets_split(docker_cp_cmd)
+        else:
+            split = docker_cp_cmd.split()
+            srcs = split[:-1]
+            dest = split[-1]
+        cmd = self.COPY_helper(srcs, dest)
+        self.put_together(x, name=self.COPY_name_helper(srcs, dest), cmd=cmd)
 
     #Logic for a ENV command (Sets environment variables)
     def ENV(self, x):
@@ -113,27 +113,25 @@ class Docker:
     """------------------COMMAND HELPER FUNCTIONS-------------------------"""
     #Determines if you need to get from remote location,
     #   unarchive a tar, or just copy
-    def ADD_helper(self, x):
-        docker_file = self.docker_file
-
-        input_cmd = self.condense_multiline_cmds(x)
-        split_cmd = input_cmd.split()
-        if self.is_url(split_cmd[0]):
-            return '  get_url:\n    url: ' + split_cmd[0] + '\n    dest: ' + split_cmd[1]
-        elif self.is_tar(split_cmd[0]):
-            if '$' in input_cmd: #Cut down on bashrc calls
-                return '  shell: . ~/.bashrc; tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
+    def ADD_helper(self, src, dest):
+        if self.is_url(src):
+            return '  get_url:\n    url: ' + src + '\n    dest: ' + dest, 'url'
+        elif self.is_tar(src):
+            if '$' in src or '$' in dest: #Cut down on bashrc calls
+                return '  shell: . ~/.bashrc; tar -x ' + src + ' ' + dest, 'tar'
             else:
-                return '  shell: tar -x ' + split_cmd[0] + ' ' + split_cmd[1]
+                return '  shell: tar -x ' + src + ' ' + dest, 'tar'
         else:
-            return ''
+            return self.COPY_helper([src], dest), 'copy'
 
     #Returns name based on if getting from url or unarchiving
-    def ADD_name_helper(self, cmd):
-        if cmd.split()[0] == 'get_url:':
-            return 'Copy file from ' + cmd.split()[2]
-        else:
-            return 'Unarchive ' + cmd.split()[3]
+    def ADD_name_helper(self, _type, src, dest):
+        if _type == 'url':
+            return 'Copy file from ' + src
+        elif _type == 'copy':
+            return self.COPY_name_helper([src], dest)
+        elif _type == 'tar':
+            return 'Unarchive ' + src + ' to ' + dest
 
     #Takes all comments from y up and appends them (Usually pass x-1)
     def comments(self, y):
@@ -176,21 +174,19 @@ class Docker:
 
     #COPY allows for COPY <src> <src>... <dest>
     #Checks for copying multiple files at once
-    def COPY_helper(self, docker_cp_cmd):
-        docker_cp_cmd += ' ' #append space so that last arg is added
-        open_quote = False
-        word = ''
-        split_cmd = []
-
-        for char in docker_cp_cmd:
-            if char == '"':
-                open_quote =  not open_quote
-            if (not open_quote and char != ' ') and char != '"':
-                word+=char
-            if (not open_quote and char == ' '):
-                split_cmd.append(word)
-                word = ''
-        return split_cmd[:-1], split_cmd[-1]
+    def COPY_helper(self, srcs, dest):
+        cmd =  '  copy:\n'
+        cmd += '    src: "{{item}}"\n'
+        cmd += '    dest: ' + dest + '\n'
+        cmd += '    mode: 0744\n'
+        cmd += '  with_fileglob:\n'
+        for src in srcs: #add all sources to fileglob
+            if not os.path.isfile(src):
+                src = self.dir_str + '/' + src
+                if not os.path.isfile(src):
+                    print('WARNING: Possible copy issue with file:' + src)
+            cmd += '    - ' + src + '\n'
+        return cmd[:-1] #remove last \n
 
     #Returns name with the src and dest in title
     def COPY_name_helper(self, srcs, dest):
@@ -226,6 +222,10 @@ class Docker:
         else:
             return ''
 
+    #Returns true if cmd uses ["<src>",..."<dest>"] format
+    def is_square_brackets(self, cmd):
+        return cmd[0:2] == '["'
+
     #Return true if _file is a tar archive. Can only go by file name
     def is_tar(self, _file):
         extensions = {'.tar', '.gz', '.bz2', '.xz'}
@@ -245,6 +245,25 @@ class Docker:
         self.comments(x-1)
         ansible_file.append('- name: ' + name)
         ansible_file.append(cmd)
+
+    #Breaks the square brackets notation into srcs and dest
+    def square_brackets_split(self, cmd):
+        cmd = cmd[1:-1] #remove square brackets
+        open_quote = False
+        split_cmd = []
+
+        word = ''
+        for char in cmd:
+            if char == '"':
+                open_quote =  not open_quote
+            if open_quote and char != '"':
+                if char == ' ':
+                    word+='\\' #escape spaces
+                word+=char
+            if not open_quote and char == '"':
+                split_cmd.append(word)
+                word = ''
+        return split_cmd[:-1], split_cmd[-1]
 
 
 """
