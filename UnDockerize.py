@@ -140,18 +140,18 @@ class Docker:
         ansible_file = self.ansible_file
 
         #Include comments above the RUN command
-        comments = ''
+        comments = []
         while y >= 0:
             line_split = docker_file[y].split()
             if len(line_split) > 0 and line_split[0][0] == '#': #Comment line
-                comments += ' '.join(line_split) + '\n'
+                comments.append(' '.join(line_split))
                 y -= 1
             else: #No more comments
-                comments = comments[:len(comments)-1] #remove last \n
                 break
 
-        if comments != '':
-            ansible_file.append(comments)
+        if len(comments) > 0:
+            comments.reverse() #added comments in reverse order
+            ansible_file.append('\n'.join(comments))
 
     #Account for backslashes to condense multiline command into one line
     def condense_multiline_cmds(self, x):
