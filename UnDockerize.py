@@ -112,7 +112,8 @@ class Docker:
 
     """------------------COMMAND HELPER FUNCTIONS-------------------------"""
     #Determines if you need to get from remote location,
-    #   unarchive a tar, or just copy
+    #   unarchive a tar, or just copy and returns the cmd,
+    #   along with what type it was for naming later
     def ADD_helper(self, src, dest):
         if self.is_url(src):
             return '  get_url:\n    url: ' + src + '\n    dest: ' + dest, 'url'
@@ -124,7 +125,7 @@ class Docker:
         else:
             return self.COPY_helper([src], dest), 'copy'
 
-    #Returns name based on if getting from url or unarchiving
+    #Returns name based on if getting from url, unarchiving, or copying
     def ADD_name_helper(self, _type, src, dest):
         if _type == 'url':
             return 'Copy file from ' + src
@@ -174,6 +175,7 @@ class Docker:
 
     #COPY allows for COPY <src> <src>... <dest>
     #Checks for copying multiple files at once
+    #Returns the copy command
     def COPY_helper(self, srcs, dest):
         cmd =  '  copy:\n'
         cmd += '    src: "{{item}}"\n'
