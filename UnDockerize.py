@@ -14,10 +14,10 @@ class Docker:
     #Instantiates an array with all of the lines in the given docker file
     def __init__(self, file_name, dir_str):
         #instance vars
-        self.docker_file = []
-        self.ansible_file = ['---']
-        self.work_dir = '~/'
-        self.FROM = ''
+        self.docker_file = [] #array of the lines in the dockerfile
+        self.ansible_file = ['---'] #array of converted file
+        self.work_dir = '~/' #current working directory for ansible
+        self.FROM = '' #the from line in the file
         self.dir_str = dir_str #where the dependencies are located (root of Dockerfile)
         self.current_comments = [] #holds comments until empty line or a command
         self.cases = { #different cases for the docker file syntax
@@ -306,7 +306,6 @@ class Ansible:
 #   the Dependencies directory
 def dependencies_copy(repo, dir_str):
     dependencies_repo_dir = dependencies_dir + repo + dir_str
-    repo_depend_dirs.append(dependencies_repo_dir) #Keep track of where everything is going
 
     if os.path.isdir(dependencies_repo_dir): #Delete the old dir
         shutil.rmtree(dependencies_repo_dir)
@@ -389,8 +388,6 @@ if __name__ == "__main__":
     repos = [] #Cloned Repo names
     repo_versions = [] #Versions to store for yml file names
     repo_tasks = [] #Ansible task names to be used for roles
-    repo_depend_dirs = [] #Actual dirs that include the version dirs of the dependencies
-    dependecy_files = [] #Holds the names of the files getting copied to the remote host
 
     #Parse input Dockerfile
     if os.path.isfile(input_file):
