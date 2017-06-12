@@ -55,7 +55,7 @@ class Docker:
                 elif '#' in command:
                     current_comments.append(docker_file[x])
                 elif 'FROM' not in command: #Append any unhandled commands as comments
-                    ansible_file.append('# UNDOCKERIZE: !!MISSING COMMAND!!: ' + docker_file[x])
+                    ansible_file.append('# *****UNDOCKERIZE*****: !!MISSING COMMAND!!: ' + docker_file[x])
             else: #must be empty line
                 del current_comments[:]
             x+=1
