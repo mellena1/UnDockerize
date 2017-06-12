@@ -42,23 +42,27 @@ class Docker:
         cases = self.cases
 
         #Check each line for command, run cooresponding function
-        for x in range(0,len(docker_file)):
+        x = 0
+        while x < len(docker_file):
             line_split = docker_file[x].split()
             if len(line_split) > 0:
                 command = line_split[0]
                 if command in cases:
-                    cases[command](x)
+                    x = cases[command](x) #returns the next spot to go to (handles multi-line commands)
                     ansible_file.append('') #add new line after command
+                elif '#' not in command and 'FROM' not in command: #Append any unhandled commands as comments
+                    ansible_file.append('# UNDOCKERIZE: !!MISSING COMMAND!!: ' + docker_file[x])
+            x+=1
         del self.ansible_file[-1] # remove the last \n
 
     """--------------------------COMMANDS---------------------------------"""
     #Logic for an ADD command (Can copy, download from remote, or unarchive)
     def ADD(self, x):
-        cmd = self.condense_multiline_cmds(x)
-        if self.is_square_brackets(cmd):
-            srcs, dest = self.square_brackets_split(cmd)
+        add_cmd, new_x = self.condense_multiline_cmds(x)
+        if self.is_square_brackets(add_cmd):
+            srcs, dest = self.square_brackets_split(add_cmd)
         else:
-            split = cmd.split()
+            split = add_cmd.split()
             srcs = split[:-1]
             dest = split[-1]
 
@@ -66,11 +70,12 @@ class Docker:
         for src in srcs:
             cmd, _type = self.ADD_helper(src, dest)
             self.put_together(x, name=self.ADD_name_helper(_type,src,dest), cmd=cmd)
+        return new_x
 
     #Logic for a COPY command (Copies file to another location)
     #Doesn't work with env vars right now
     def COPY(self, x):
-        docker_cp_cmd = self.condense_multiline_cmds(x)
+        docker_cp_cmd, new_x = self.condense_multiline_cmds(x)
         if self.is_square_brackets(docker_cp_cmd):
             srcs, dest = self.square_brackets_split(docker_cp_cmd)
         else:
@@ -79,16 +84,19 @@ class Docker:
             dest = split[-1]
         cmd = self.COPY_helper(srcs, dest)
         self.put_together(x, name=self.COPY_name_helper(srcs, dest), cmd=cmd)
+        return new_x
 
     #Logic for a ENV command (Sets environment variables)
     def ENV(self, x):
-        env_vars, spaced = self.ENV_helper(self.condense_multiline_cmds(x))
+        env_cmd, new_x = self.condense_multiline_cmds(x)
+        env_vars, spaced = self.ENV_helper(env_cmd)
         cmd = """  lineinfile:\n    dest: ~/.bashrc\n    line: 'export """+env_vars+"'"
         self.put_together(x, name=self.ENV_name_helper(env_vars, spaced), cmd=cmd)
+        return new_x
 
     #Logic for a RUN command (Shell command)
     def RUN(self, x):
-        shell_cmd = self.condense_multiline_cmds(x)
+        shell_cmd, new_x = self.condense_multiline_cmds(x)
         if '$' in shell_cmd:
             cmd = '  shell: . ~/.bashrc; '+self.get_work_dir_cmd() #Source bashrc if an env var is mentioned
         else:
@@ -96,11 +104,12 @@ class Docker:
         cmd += shell_cmd
         name = 'Shell Command (' + ' '.join(shell_cmd.split()[0:5]) + ')'
         self.put_together(x, name=name, cmd=cmd)
+        return new_x
 
     #Logic for a WORKDIR command (change dir for next commands)
     #Works for RUN, CMD, ENTRYPOINT, COPY, ADD
     def WORKDIR(self, x):
-        _dir = self.docker_file[x].split()[1]
+        _dir, new_x = self.condense_multiline_cmds(x)
         self.work_dir = _dir
         name = 'Working dir- ' + _dir
         if '$' in _dir: #cut down on bashrc calls
@@ -108,6 +117,7 @@ class Docker:
         else:
             cmd = '  shell: mkdir -p ' + _dir
         self.put_together(x, name=name, cmd=cmd)
+        return new_x
 
 
     """------------------COMMAND HELPER FUNCTIONS-------------------------"""
@@ -171,7 +181,7 @@ class Docker:
             else: #End of a statement
                 line += ' '.join(line_split)
                 break
-        return line
+        return line, x
 
     #COPY allows for COPY <src> <src>... <dest>
     #Checks for copying multiple files at once
