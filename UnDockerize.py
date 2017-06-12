@@ -18,7 +18,8 @@ class Docker:
         self.ansible_file = ['---']
         self.work_dir = '~/'
         self.FROM = ''
-        self.dir_str = dir_str
+        self.dir_str = dir_str #where the dependencies are located (root of Dockerfile)
+        self.current_comments = [] #holds comments until empty line or a command
         self.cases = { #different cases for the docker file syntax
                         'ADD'     : self.ADD,
                         'COPY'    : self.COPY,
@@ -39,6 +40,7 @@ class Docker:
     def parse_docker(self):
         docker_file = self.docker_file
         ansible_file = self.ansible_file
+        current_comments = self.current_comments
         cases = self.cases
 
         #Check each line for command, run cooresponding function
@@ -50,8 +52,12 @@ class Docker:
                 if command in cases:
                     x = cases[command](x) #returns the next spot to go to (handles multi-line commands)
                     ansible_file.append('') #add new line after command
-                elif '#' not in command and 'FROM' not in command: #Append any unhandled commands as comments
+                elif '#' in command:
+                    current_comments.append(docker_file[x])
+                elif 'FROM' not in command: #Append any unhandled commands as comments
                     ansible_file.append('# UNDOCKERIZE: !!MISSING COMMAND!!: ' + docker_file[x])
+            else: #must be empty line
+                del current_comments[:]
             x+=1
         del self.ansible_file[-1] # remove the last \n
 
@@ -144,24 +150,14 @@ class Docker:
         elif _type == 'tar':
             return 'Unarchive ' + src + ' to ' + dest
 
-    #Takes all comments from y up and appends them (Usually pass x-1)
-    def comments(self, y):
-        docker_file = self.docker_file
+    #Appends the current_comments to the ansible file
+    def comments(self):
         ansible_file = self.ansible_file
-
-        #Include comments above the RUN command
-        comments = []
-        while y >= 0:
-            line_split = docker_file[y].split()
-            if len(line_split) > 0 and line_split[0][0] == '#': #Comment line
-                comments.append(' '.join(line_split))
-                y -= 1
-            else: #No more comments
-                break
+        comments = self.current_comments
 
         if len(comments) > 0:
-            comments.reverse() #added comments in reverse order
             ansible_file.append('\n'.join(comments))
+            del comments[:]
 
     #Account for backslashes to condense multiline command into one line
     def condense_multiline_cmds(self, x):
@@ -254,7 +250,7 @@ class Docker:
         docker_file = self.docker_file
         ansible_file = self.ansible_file
 
-        self.comments(x-1)
+        self.comments()
         ansible_file.append('- name: ' + name)
         ansible_file.append(cmd)
 
