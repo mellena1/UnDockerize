@@ -2,10 +2,10 @@
 A Python script to convert a Dockerfile to an Ansible-Playbook
 
 ## Usage
-`UnDockerize.py [-h] [-i input_file] [-o output_file]`</br></br>
+`UnDockerize.py [-h] [-i input_file] [-o output_role]`</br></br>
 `-h or --help: show the help message and exit.`</br>
 `-i input_file specifies the input file. Defaults to Dockerfile`</br>
-`-o output_file specifies the output Ansible role name. Defaults to UnDockeried`
+`-o output_role specifies the output Ansible role name. Defaults to UnDockeried`
 
 ## Capabilities
 UnDockerize can currently handle a lot of the built in Dockerfile commands and automatically convert them into Ansible code.
