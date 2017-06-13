@@ -7,7 +7,7 @@ from subprocess import call as subprocess_call, PIPE
 
 """
 Docker Class
--------------
+----------------------------------------
 Holds the Docker file info and parses it all
 """
 class Docker:
@@ -61,7 +61,7 @@ class Docker:
             x+=1
         del self.ansible_file[-1] # remove the last \n
 
-    """--------------------------COMMANDS---------------------------------"""
+    """----------------------------------------COMMANDS----------------------------------------"""
     #Logic for an ADD command (Can copy, download from remote, or unarchive)
     def ADD(self, x):
         add_cmd, new_x = self.condense_multiline_cmds(x)
@@ -126,7 +126,7 @@ class Docker:
         return new_x
 
 
-    """------------------COMMAND HELPER FUNCTIONS-------------------------"""
+    """----------------------------------------COMMAND HELPER FUNCTIONS----------------------------------------"""
     #Determines if you need to get from remote location,
     #   unarchive a tar, or just copy and returns the cmd,
     #   along with what type it was for naming later
@@ -276,7 +276,7 @@ class Docker:
 
 """
 Ansible Class
-------------------
+----------------------------------------
 Holds the ansible info and writes the array to the yml file
 """
 class Ansible:
@@ -301,7 +301,7 @@ class Ansible:
                 f.write(line + '\n')
 
 
-"""-------------------------------------FROM STUFF------------------------------"""
+"""----------------------------------------FROM STUFF----------------------------------------"""
 #Copies the parent folder of the Dockerfile into
 #   the Dependencies directory
 def dependencies_copy(repo, dir_str):
@@ -370,7 +370,7 @@ def remove_all_repos():
     for repo in repos:
         shutil.rmtree(repo)
 
-"""--------------------------------MAIN------------------------------------------"""
+"""----------------------------------------MAIN----------------------------------------"""
 #Main function
 if __name__ == "__main__":
     #command-line argument stuff
