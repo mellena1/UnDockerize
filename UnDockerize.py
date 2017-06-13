@@ -350,6 +350,8 @@ def get_repos_with_FROM(FROM):
 #Makes a config file to make sure long commands don't time out the ssh connection
 def make_ansible_config_file():
     with open('ansible.cfg', 'w') as f:
+        f.write('[defaults]')
+        f.write('host_key_checking = False')
         f.write('[ssh_connection]\n')
         f.write('ssh_args = -o ServerAliveInterval=60 -o ServerAliveCountMax=60')
 
