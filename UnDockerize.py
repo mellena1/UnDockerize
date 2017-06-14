@@ -51,7 +51,6 @@ class Docker:
                 command = line_split[0]
                 if command in cases:
                     x = cases[command](x) #returns the next spot to go to (handles multi-line commands)
-                    ansible_file.append('') #add new line after command
                 elif '#' in command:
                     current_comments.append(docker_file[x])
                 elif 'FROM' not in command: #Append any unhandled commands as comments
@@ -134,17 +133,14 @@ class Docker:
         if self.is_url(src):
             return '  get_url:\n    url: ' + src + '\n    dest: ' + dest, 'url'
         elif self.is_tar(src):
-            if '$' in src or '$' in dest: #Cut down on bashrc calls
-                return '  shell: . ~/.bashrc; tar -x ' + src + ' ' + dest, 'tar'
-            else:
-                return '  shell: tar -x ' + src + ' ' + dest, 'tar'
+                return '  unarchive:\n    src: ' + src + '\n    dest: ' + dest, 'tar'
         else:
             return self.COPY_helper([src], dest), 'copy'
 
     #Returns name based on if getting from url, unarchiving, or copying
     def ADD_name_helper(self, _type, src, dest):
         if _type == 'url':
-            return 'Copy file from ' + src
+            return 'Download file from ' + src + ' to ' + dest
         elif _type == 'copy':
             return self.COPY_name_helper([src], dest)
         elif _type == 'tar':
@@ -253,6 +249,7 @@ class Docker:
         self.comments()
         ansible_file.append('- name: ' + name)
         ansible_file.append(cmd)
+        ansible_file.append('') #New line after command
 
     #Breaks the square brackets notation into srcs and dest
     def square_brackets_split(self, cmd):

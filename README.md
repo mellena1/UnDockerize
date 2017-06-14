@@ -53,7 +53,10 @@ ADD /Foo/foo.tar /
 ADD /Foo/foo.gz /
 ADD /Foo/foo.bz2 /
 ADD /Foo/foo.xz /
+COPY Foo /foo/foo_copy
 ADD Foo /foo/foo
+
+ADD ["foo bar/foo", "foo", "foo bar", "foo bar.tar", "bar"]
 ```
 
 ### into this Ansible code:
@@ -67,22 +70,38 @@ ADD Foo /foo/foo
     dest: ~/.bashrc
     line: 'export PATH=blah HI=foo foo=bar fool=baff dsf=asffas'
 
-- name: Copy file from https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml
+- name: Download file from https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml to /
   get_url:
     url: https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml
     dest: /
 
-- name: Unarchive /Foo/foo.tar
-  shell: tar -x /Foo/foo.tar /
+- name: Unarchive /Foo/foo.tar to /
+  unarchive:
+    src: /Foo/foo.tar
+    dest: /
 
-- name: Unarchive /Foo/foo.gz
-  shell: tar -x /Foo/foo.gz /
+- name: Unarchive /Foo/foo.gz to /
+  unarchive:
+    src: /Foo/foo.gz
+    dest: /
 
-- name: Unarchive /Foo/foo.bz2
-  shell: tar -x /Foo/foo.bz2 /
+- name: Unarchive /Foo/foo.bz2 to /
+  unarchive:
+    src: /Foo/foo.bz2
+    dest: /
 
-- name: Unarchive /Foo/foo.xz
-  shell: tar -x /Foo/foo.xz /
+- name: Unarchive /Foo/foo.xz to /
+  unarchive:
+    src: /Foo/foo.xz
+    dest: /
+
+- name: Copy Foo to /foo/foo_copy
+  copy:
+    src: "{{item}}"
+    dest: /foo/foo_copy
+    mode: 0744
+  with_fileglob:
+    - ./Foo
 
 - name: Copy Foo to /foo/foo
   copy:
@@ -91,4 +110,33 @@ ADD Foo /foo/foo
     mode: 0744
   with_fileglob:
     - ./Foo
+
+- name: Copy foo\ bar/foo to bar
+  copy:
+    src: "{{item}}"
+    dest: bar
+    mode: 0744
+  with_fileglob:
+    - ./foo\ bar/foo
+
+- name: Copy foo to bar
+  copy:
+    src: "{{item}}"
+    dest: bar
+    mode: 0744
+  with_fileglob:
+    - ./foo
+
+- name: Copy foo\ bar to bar
+  copy:
+    src: "{{item}}"
+    dest: bar
+    mode: 0744
+  with_fileglob:
+    - ./foo\ bar
+
+- name: Unarchive foo\ bar.tar to bar
+  unarchive:
+    src: foo\ bar.tar
+    dest: bar
 ```
