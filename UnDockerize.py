@@ -3,6 +3,7 @@ import urlparse
 import os.path
 import urllib
 import shutil
+import re
 from subprocess import call as subprocess_call, PIPE
 
 """
@@ -20,6 +21,7 @@ class Docker:
         self.FROM = '' #the from line in the file
         self.dir_str = dir_str #where the dependencies are located (root of Dockerfile)
         self.current_comments = [] #holds comments until empty line or a command
+        self.all_env_vars = {} #Dictionary of environment vars set throughout the script
         self.cases = { #different cases for the docker file syntax
                         'ADD'     : self.ADD,
                         'COPY'    : self.COPY,
@@ -71,10 +73,11 @@ class Docker:
             srcs = split[:-1]
             dest = split[-1]
 
-        copies = []
+        if self.is_relative_path(dest):
+            dest = self.work_dir + '/' + dest
         for src in srcs:
             cmd, _type = self.ADD_helper(src, dest)
-            self.put_together(x, name=self.ADD_name_helper(_type,src,dest), cmd=cmd)
+            self.put_together('ADD', name=self.ADD_name_helper(_type,src,dest), cmd=cmd)
         return new_x
 
     #Logic for a COPY command (Copies file to another location)
@@ -87,41 +90,55 @@ class Docker:
             split = docker_cp_cmd.split()
             srcs = split[:-1]
             dest = split[-1]
+        if self.is_relative_path(dest):
+            dest = self.work_dir + '/' + dest
         cmd = self.COPY_helper(srcs, dest)
-        self.put_together(x, name=self.COPY_name_helper(srcs, dest), cmd=cmd)
+        self.put_together('COPY', name=self.COPY_name_helper(srcs, dest), cmd=cmd)
         return new_x
 
     #Logic for a ENV command (Sets environment variables)
     def ENV(self, x):
         env_cmd, new_x = self.condense_multiline_cmds(x)
         env_vars, spaced = self.ENV_helper(env_cmd)
-        cmd = """  lineinfile:\n    dest: ~/.bashrc\n    line: 'export """+env_vars+"'"
-        self.put_together(x, name=self.ENV_name_helper(env_vars, spaced), cmd=cmd)
+
+        #Add the env vars to the dictionary
+        _vars, _vals = self.ENV_parser(env_vars)
+        for x in range(0,len(_vars)):
+            #Replace other env vars with the values if set above them
+            other_env_vars = self.find_env_vars(_vals[x])
+            for _var in other_env_vars:
+                if self.all_env_vars.get(_var) is not None:
+                    _vals[x] = _vals[x].replace('$' + _var, self.all_env_vars.get(_var))
+            #Save to the dictionary
+            self.all_env_vars[_vars[x]] = _vals[x]
+
+        cmd = []
+        cmd.append('  lineinfile:')
+        cmd.append('    dest: ~/.bashrc')
+        cmd.append("    line: 'export "+env_vars+"'")
+        self.put_together('ENV', name=self.ENV_name_helper(env_vars, spaced), cmd=cmd)
         return new_x
 
     #Logic for a RUN command (Shell command)
     def RUN(self, x):
         shell_cmd, new_x = self.condense_multiline_cmds(x)
-        if '$' in shell_cmd:
-            cmd = '  shell: . ~/.bashrc; '+self.get_work_dir_cmd() #Source bashrc if an env var is mentioned
-        else:
-            cmd = '  shell: '+self.get_work_dir_cmd()
+        cmd = '  shell: '+self.get_work_dir_cmd()
         cmd += shell_cmd
         name = 'Shell Command (' + ' '.join(shell_cmd.split()[0:5]) + ')'
-        self.put_together(x, name=name, cmd=cmd)
+        self.put_together('RUN', name=name, cmd=[cmd])
         return new_x
 
     #Logic for a WORKDIR command (change dir for next commands)
-    #Works for RUN, CMD, ENTRYPOINT, COPY, ADD
+    #Supposed to work for RUN, CMD, ENTRYPOINT, COPY, ADD
     def WORKDIR(self, x):
         _dir, new_x = self.condense_multiline_cmds(x)
-        self.work_dir = _dir
-        name = 'Working dir- ' + _dir
-        if '$' in _dir: #cut down on bashrc calls
-            cmd = '  shell: . ~/.bashrc; mkdir -p ' + _dir
+        if self.is_relative_path(_dir):
+            self.work_dir += '/' + _dir
         else:
-            cmd = '  shell: mkdir -p ' + _dir
-        self.put_together(x, name=name, cmd=cmd)
+            self.work_dir = _dir
+        name = 'Working dir- ' + self.work_dir
+        cmd = '  shell: mkdir -p ' + self.work_dir
+        self.put_together('WORKDIR', name=name, cmd=[cmd])
         return new_x
 
 
@@ -131,9 +148,17 @@ class Docker:
     #   along with what type it was for naming later
     def ADD_helper(self, src, dest):
         if self.is_url(src):
-            return '  get_url:\n    url: ' + src + '\n    dest: ' + dest, 'url'
+            cmd = []
+            cmd.append('  get_url:')
+            cmd.append('    url: ' + src)
+            cmd.append('    dest: ' + dest)
+            return cmd, 'url'
         elif self.is_tar(src):
-                return '  unarchive:\n    src: ' + src + '\n    dest: ' + dest, 'tar'
+            cmd = []
+            cmd.append('  unarchive:')
+            cmd.append('    src: ' + src)
+            cmd.append('    dest: ' + dest)
+            return cmd, 'tar'
         else:
             return self.COPY_helper([src], dest), 'copy'
 
@@ -152,7 +177,8 @@ class Docker:
         comments = self.current_comments
 
         if len(comments) > 0:
-            ansible_file.append('\n'.join(comments))
+            for comment in comments:
+                ansible_file.append(comment)
             del comments[:]
 
     #Account for backslashes to condense multiline command into one line
@@ -179,18 +205,19 @@ class Docker:
     #Checks for copying multiple files at once
     #Returns the copy command
     def COPY_helper(self, srcs, dest):
-        cmd =  '  copy:\n'
-        cmd += '    src: "{{item}}"\n'
-        cmd += '    dest: ' + dest + '\n'
-        cmd += '    mode: 0744\n'
-        cmd += '  with_fileglob:\n'
+        cmd = []
+        cmd.append('  copy:')
+        cmd.append('    src: "{{item}}"')
+        cmd.append('    dest: ' + dest)
+        cmd.append('    mode: 0744')
+        cmd.append('  with_fileglob:')
         for src in srcs: #add all sources to fileglob
             if not os.path.isfile(src):
                 src = self.dir_str + '/' + src
                 if not os.path.isfile(src):
                     print('WARNING: Possible copy issue with file:' + src)
-            cmd += '    - ' + src + '\n'
-        return cmd[:-1] #remove last \n
+            cmd.append('    - ' + src)
+        return cmd
 
     #Returns name with the src and dest in title
     def COPY_name_helper(self, srcs, dest):
@@ -208,23 +235,78 @@ class Docker:
 
     #Returns name with all ENV vars in title
     def ENV_name_helper(self, env_vars, spaced):
-        env_var_names = []
-        env_vars_split = env_vars.split()
+        #regex explanation:
+        #([a-zA-Z0-9_]+)= #capture something with one or more env allowed chars followed by =
+        #The rest is to make sure that the above capture isn't surrounded with quotes
+        #Found at: https://stackoverflow.com/questions/15464299/regex-expression-to-match-even-number-of-double-quotation-not-match-single-o
+        #(?=              #Only if the following regex matches
+        #(?:              #match
+        #[^"]*"           #Any number of quotes followed by a quotes
+        #[^"]*"           #Again to make sure even number of quotes
+        #)*               #as many times as needed
+        #[^"]*$)          #match the remaining non-quote characters until the end of the string
+        found_vars = re.findall(r'([a-zA-Z0-9_]+)=(?=(?:[^"]*"[^"]*")*[^"]*$)', env_vars)
+        return 'Set ENV vars- ' + ' '.join(found_vars)
 
-        if spaced: #Only one ENV var being set
-            env_var_names.append(env_vars_split[0].split('=')[0])
-        else:
-            for vals in env_vars_split:
-                env_var_names.append(vals.split('=')[0])
-        return 'Set ENV vars- ' + ' '.join(env_var_names)
+    #Straight Hell incarniate
+    #This function hopefully takes an export ENV command and splits it
+    #   into variables and values
+    def ENV_parser(self, env_vars):
+        env_vars += ' ' #add space at end so everything will append
+        open_quote = False
+        last_backslash = False
+        is_var = True
+        _vars = []
+        _vals = []
+
+        word = ''
+        for char in env_vars:
+            if is_var and char == '=': #end of a var
+                _vars.append(word)
+                word = ''
+                is_var = False
+            elif is_var and char != ' ':
+                word+=char
+            elif is_var: #must be space between val and var
+                continue
+            #everything after this is a value
+            elif char == '"':
+                open_quote = not open_quote
+                if open_quote == False:
+                    _vals.append(word)
+                    word = ''
+                    is_var = True
+            elif open_quote:
+                word += char
+            #everything after this is not in quotes
+            elif char == '\\' and not last_backslash:
+                last_backslash = True
+            elif last_backslash: #escaped char
+                word += char
+                last_backslash = False
+            elif char == ' ': #space but not escaped
+                _vals.append(word)
+                word = ''
+                is_var = True
+            else: #add every other char
+                word += char
+        return _vars, _vals
+
+    #Regex expression to find env variables
+    def find_env_vars(self, cmd):
+        return re.findall(r'[$]([a-zA-Z0-9_]+)', cmd)
 
     #Returns either '' or 'cd work_dir && '
     def get_work_dir_cmd(self):
         work_dir = self.work_dir
-        if work_dir != '':
+        if work_dir != '~/':
             return 'cd ' + work_dir + ' && '
         else:
             return ''
+
+    #Returns true if path doesn't start with '/' or ~ (must be relative)
+    def is_relative_path(self, path):
+        return path[0] != '/' and path[0] != '~'
 
     #Returns true if cmd uses ["<src>",..."<dest>"] format
     def is_square_brackets(self, cmd):
@@ -242,13 +324,30 @@ class Docker:
     #The common stuff of every command
     #Adds the comments above, then the name and
     #   command lines to the ansible_file array
-    def put_together(self, x, name, cmd):
+    def put_together(self, _type, name, cmd):
         docker_file = self.docker_file
         ansible_file = self.ansible_file
 
         self.comments()
         ansible_file.append('- name: ' + name)
-        ansible_file.append(cmd)
+        need_env_vars = {}
+        need_environment = False
+        for line in cmd:
+            ansible_file.append(line)
+            #env_var stuff
+            poss_vars = self.find_env_vars(line)
+            for _var in poss_vars:
+                poss = self.all_env_vars.get(_var)
+                if poss is not None and need_env_vars.get(_var) is None:
+                    need_env_vars[_var] = poss
+                    if not need_environment:
+                        need_environment = True
+        if need_environment and _type != 'ENV':
+            ansible_file.append('  environment:')
+            for _var, _val in need_env_vars.items():
+                if '~' in _val: #ansible doesn't handle tildes for env vars correctly without filter
+                    _val = '{{ "' + _val + '" | expanduser }}'
+                ansible_file.append('    ' + _var + ': ' + _val)
         ansible_file.append('') #New line after command
 
     #Breaks the square brackets notation into srcs and dest
@@ -260,7 +359,7 @@ class Docker:
         word = ''
         for char in cmd:
             if char == '"':
-                open_quote =  not open_quote
+                open_quote = not open_quote
             if open_quote and char != '"':
                 if char == ' ':
                     word+='\\' #escape spaces
@@ -278,8 +377,9 @@ Holds the ansible info and writes the array to the yml file
 """
 class Ansible:
     #Instantiates Ansible object
-    def __init__(self, ansible_array):
+    def __init__(self, ansible_array, env_vars):
         self.ansible = ansible_array
+        self.env_vars = env_vars
 
     #Writes self.ansible to a .yml Ansible file
     def write_to_file(self, file_name):
@@ -347,20 +447,20 @@ def get_repos_with_FROM(FROM):
 #Makes a config file to make sure long commands don't time out the ssh connection
 def make_ansible_config_file():
     with open('ansible.cfg', 'w') as f:
-        f.write('[defaults]')
-        f.write('host_key_checking = False')
+        f.write('[defaults]\n')
+        f.write('host_key_checking = False\n\n')
         f.write('[ssh_connection]\n')
-        f.write('ssh_args = -o ServerAliveInterval=60 -o ServerAliveCountMax=60')
+        f.write('ssh_args = -o ServerAliveInterval=30 -o ServerAliveCountMax=30')
 
 #Creates a role file (site.yml) given all of the tasks
 def make_ansible_role_file(tasks):
-    ansible_role = ['---']
-    ansible_role.append('- hosts: all')
-    ansible_role.append('  become: yes')
-    ansible_role.append('  roles:')
-    for task in tasks:
-        ansible_role.append('    - ' + task)
-    return ansible_role
+    with open('site.yml', 'w') as f:
+        f.write('---\n')
+        f.write('- hosts: all\n')
+        f.write('  become: yes\n')
+        f.write('  roles:\n')
+        for task in tasks:
+            f.write('    - ' + task + '\n')
 
 #Gets rid of all of the repos that were downloaded
 def remove_all_repos():
@@ -402,7 +502,7 @@ if __name__ == "__main__":
     for x in range(0, len(docker_files)):
         docker_file = docker_files[x]
         docker_file.parse_docker()
-        ansible_file = Ansible(docker_file.ansible_file)
+        ansible_file = Ansible(docker_file.ansible_file, docker_file.all_env_vars)
 
         #Location and file name
         if x == 0:
@@ -419,8 +519,7 @@ if __name__ == "__main__":
     repo_tasks.reverse()
 
     #Make the site file
-    ansible_role_file = Ansible(make_ansible_role_file(repo_tasks))
-    ansible_role_file.write_to_file('site.yml')
+    make_ansible_role_file(repo_tasks)
 
     #Generates the ansible.cfg file for ssh timeout
     make_ansible_config_file()
