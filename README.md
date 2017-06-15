@@ -2,10 +2,17 @@
 A Python script to convert a Dockerfile to an Ansible-Playbook
 
 ## Usage
-`UnDockerize.py [-h] [-i input_file] [-o output_role]`</br></br>
-`-h or --help: show the help message and exit.`</br>
-`-i input_file specifies the input file. Defaults to Dockerfile`</br>
-`-o output_role specifies the output Ansible role name. Defaults to UnDockeried`
+`UnDockerize.py [-h] [-i <input_file>] [-o <output_role>] [-c] [-n]`</br></br>
+`-h, --help        show this help message and exit`
+`-i <input_file>   The input (Dockerfile) file name; *Default: Dockerfile`
+`-o <output_role>  The output (Ansible) role name; *Default: UnDockerized`
+`-c, --clean       *****USE WITH CAUTION!!!***** Will delete everything in
+                  the UnDock_Dependencies folder, everything in the roles
+                  folder, and the site.yml file.`
+`-n, --nobuild     Won't convert any Dockerfile. Use in tandem with -c if you
+                  just want to clean the workspace. Will run nothing if used
+                  alone (Why would you want to do that? Maybe you like
+                  hitting enter in terminal).`
 
 ## Capabilities
 UnDockerize can currently handle a lot of the built in Dockerfile commands and automatically convert them into Ansible code.

@@ -399,6 +399,15 @@ class Ansible:
 
 
 """----------------------------------------FROM STUFF----------------------------------------"""
+#Deletes directories and files made by UnDockerized
+def clean_workspace():
+    if os.path.isfile('site.yml'):
+        os.remove('site.yml')
+    if os.path.isdir('roles'):
+        shutil.rmtree('roles')
+    if os.path.isdir(dependencies_dir):
+        shutil.rmtree(dependencies_dir)
+
 #Copies the parent folder of the Dockerfile into
 #   the Dependencies directory
 def dependencies_copy(repo, dir_str):
@@ -406,6 +415,7 @@ def dependencies_copy(repo, dir_str):
 
     if os.path.isdir(dependencies_repo_dir): #Delete the old dir
         shutil.rmtree(dependencies_repo_dir)
+
     shutil.copytree(repo + dir_str, dependencies_repo_dir) #Make copy of important dir for user
     #Delete all subdirs of other versions from Dependencies dir
     for root, subdirs, _ in os.walk(dependencies_repo_dir):
@@ -474,14 +484,22 @@ if __name__ == "__main__":
     #-i for input file
     #-o for output file
     argparser = argparse.ArgumentParser(description='Convert a Dockerfile to Ansible code')
-    argparser.add_argument('-i', nargs=1, default=['Dockerfile'], type=str, metavar='input_file', help='The input (Dockerfile) file name; Default: Dockerfile')
-    argparser.add_argument('-o', nargs=1, default=['UnDockerized'], type=str, metavar='output_role', help='The output (Ansible) role name; Default: UnDockerized')
+    argparser.add_argument('-i', nargs=1, default=['Dockerfile'], type=str, metavar='<input_file>', help='The input (Dockerfile) file name; *Default: Dockerfile')
+    argparser.add_argument('-o', nargs=1, default=['UnDockerized'], type=str, metavar='<output_role>', help='The output (Ansible) role name; *Default: UnDockerized')
+    argparser.add_argument('-c', '--clean', dest='clean', action='store_true', help='*****USE WITH CAUTION!!!***** Will delete everything in the UnDock_Dependencies folder, everything in the roles folder, and the site.yml file.')
+    argparser.add_argument('-n', '--nobuild', dest='nobuild', action='store_true', help="Won't convert any Dockerfile. Use in tandem with -c if you just want to clean the workspace. Will run nothing if used alone (Why would you want to do that? Maybe you like hitting enter in terminal).")
     args = vars(argparser.parse_args())
 
     input_file = args['i'][0]
     output_file = args['o'][0]
+    clean = args['clean']
+    nobuild = args['nobuild']
 
     dependencies_dir = 'UnDock_Dependencies/'
+    if clean:
+        clean_workspace()
+    if nobuild:
+        exit()
 
     docker_files = [] #Docker objects that are created
     repos = [] #Cloned Repo names
