@@ -30,6 +30,10 @@ UnDockerize can currently handle a lot of the built in Dockerfile commands and a
 
 * UnDockerize will print the name of the image that Docker started with so that you know what OS to start with.
 
+## Environment Variables
+* UnDockerize will keep track of all of the environment variables set during the Dockerfile. When they are then used in various other commands, it will use Ansible's way of defining the environment and include them for each command when needed.
+* UnDockerize will also add them to your .bashrc file, so that when the instance is launched the environment variables will remain. This can easily be tweaked manually by removing the lineinfile commands in the Ansible file if you so choose so.
+
 ## Other features
 * **Auto-naming**: UnDockerize does its best to provide each Ansible task with a relevant name to what is being done.
 * **Comments**: UnDockerize includes all trailing comments behind a valid command.
@@ -49,21 +53,21 @@ ENV PATH=blah \
     dsf=asffas
 
 ADD https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml /
-ADD /Foo/foo.tar /
-ADD /Foo/foo.gz /
-ADD /Foo/foo.bz2 /
-ADD /Foo/foo.xz /
+ADD /Foo/$HI.tar /$PATH
+ADD Foo /foo/$foo
 COPY Foo /foo/foo_copy
-ADD Foo /foo/foo
 
-ADD ["foo bar/foo", "foo", "foo bar", "foo bar.tar", "bar"]
+WORKDIR ~/new_dir
+
+ADD ["foo bar/foo", "foo.tar", "google.com", "my_dir"]
+COPY ["foo bar", "foo", "my_dir"]
 ```
 
 ### into this Ansible code:
 ```
 ---
 - name: Shell Command (rm foo)
-  shell: cd ~/ && rm foo
+  shell: rm foo
 
 - name: Set ENV vars- PATH HI foo fool dsf
   lineinfile:
@@ -75,25 +79,23 @@ ADD ["foo bar/foo", "foo", "foo bar", "foo bar.tar", "bar"]
     url: https://raw.githubusercontent.com/docker-library/elasticsearch/master/.travis.yml
     dest: /
 
-- name: Unarchive /Foo/foo.tar to /
+- name: Unarchive /Foo/$HI.tar to /$PATH
   unarchive:
-    src: /Foo/foo.tar
-    dest: /
+    src: /Foo/$HI.tar
+    dest: /$PATH
+  environment:
+    PATH: blah
+    HI: foo
 
-- name: Unarchive /Foo/foo.gz to /
-  unarchive:
-    src: /Foo/foo.gz
-    dest: /
-
-- name: Unarchive /Foo/foo.bz2 to /
-  unarchive:
-    src: /Foo/foo.bz2
-    dest: /
-
-- name: Unarchive /Foo/foo.xz to /
-  unarchive:
-    src: /Foo/foo.xz
-    dest: /
+- name: Copy Foo to /foo/$foo
+  copy:
+    src: "{{item}}"
+    dest: /foo/$foo
+    mode: 0744
+  with_fileglob:
+    - ./Foo
+  environment:
+    foo: bar
 
 - name: Copy Foo to /foo/foo_copy
   copy:
@@ -103,40 +105,36 @@ ADD ["foo bar/foo", "foo", "foo bar", "foo bar.tar", "bar"]
   with_fileglob:
     - ./Foo
 
-- name: Copy Foo to /foo/foo
-  copy:
-    src: "{{item}}"
-    dest: /foo/foo
-    mode: 0744
-  with_fileglob:
-    - ./Foo
+- name: Working dir- ~/new_dir
+  shell: mkdir -p ~/new_dir
 
-- name: Copy foo\ bar/foo to bar
+- name: Copy foo\ bar/foo to ~/new_dir/my_dir
   copy:
     src: "{{item}}"
-    dest: bar
+    dest: ~/new_dir/my_dir
     mode: 0744
   with_fileglob:
     - ./foo\ bar/foo
 
-- name: Copy foo to bar
+- name: Unarchive foo.tar to ~/new_dir/my_dir
+  unarchive:
+    src: foo.tar
+    dest: ~/new_dir/my_dir
+
+- name: Copy google.com to ~/new_dir/my_dir
   copy:
     src: "{{item}}"
-    dest: bar
+    dest: ~/new_dir/my_dir
     mode: 0744
   with_fileglob:
-    - ./foo
+    - ./google.com
 
-- name: Copy foo\ bar to bar
+- name: Copy foo\ bar foo to ~/new_dir/my_dir
   copy:
     src: "{{item}}"
-    dest: bar
+    dest: ~/new_dir/my_dir
     mode: 0744
   with_fileglob:
     - ./foo\ bar
-
-- name: Unarchive foo\ bar.tar to bar
-  unarchive:
-    src: foo\ bar.tar
-    dest: bar
+    - ./foo
 ```
