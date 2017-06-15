@@ -21,7 +21,7 @@ class Docker:
         self.FROM = '' #the from line in the file
         self.dir_str = dir_str #where the dependencies are located (root of Dockerfile)
         self.current_comments = [] #holds comments until empty line or a command
-        self.all_env_vars = {}
+        self.all_env_vars = {} #Dictionary of environment vars set throughout the script
         self.cases = { #different cases for the docker file syntax
                         'ADD'     : self.ADD,
                         'COPY'    : self.COPY,
@@ -100,9 +100,18 @@ class Docker:
     def ENV(self, x):
         env_cmd, new_x = self.condense_multiline_cmds(x)
         env_vars, spaced = self.ENV_helper(env_cmd)
+
+        #Add the env vars to the dictionary
         _vars, _vals = self.ENV_parser(env_vars)
         for x in range(0,len(_vars)):
+            #Replace other env vars with the values if set above them
+            other_env_vars = self.find_env_vars(_vals[x])
+            for _var in other_env_vars:
+                if self.all_env_vars.get(_var) is not None:
+                    _vals[x] = _vals[x].replace('$' + _var, self.all_env_vars.get(_var))
+            #Save to the dictionary
             self.all_env_vars[_vars[x]] = _vals[x]
+
         cmd = []
         cmd.append('  lineinfile:')
         cmd.append('    dest: ~/.bashrc')
@@ -336,6 +345,8 @@ class Docker:
         if need_environment and _type != 'ENV':
             ansible_file.append('  environment:')
             for _var, _val in need_env_vars.items():
+                if '~' in _val: #ansible doesn't handle tildes for env vars correctly without filter
+                    _val = '{{ "' + _val + '" | expanduser }}'
                 ansible_file.append('    ' + _var + ': ' + _val)
         ansible_file.append('') #New line after command
 
@@ -436,10 +447,10 @@ def get_repos_with_FROM(FROM):
 #Makes a config file to make sure long commands don't time out the ssh connection
 def make_ansible_config_file():
     with open('ansible.cfg', 'w') as f:
-        f.write('[defaults]')
-        f.write('host_key_checking = False')
+        f.write('[defaults]\n')
+        f.write('host_key_checking = False\n\n')
         f.write('[ssh_connection]\n')
-        f.write('ssh_args = -o ServerAliveInterval=60 -o ServerAliveCountMax=60')
+        f.write('ssh_args = -o ServerAliveInterval=30 -o ServerAliveCountMax=30')
 
 #Creates a role file (site.yml) given all of the tasks
 def make_ansible_role_file(tasks):
