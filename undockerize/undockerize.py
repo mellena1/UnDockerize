@@ -479,7 +479,7 @@ class Ansible:
                 f.write(line + '\n')
 
 
-"""------------------FROM STUFF------------------------"""
+"""------------------------------FROM STUFF--------------------------------"""
 
 
 def clean_workspace():
@@ -500,6 +500,7 @@ def dependencies_copy(repo, dir_str):
     the Dependencies directory
     """
     dependencies_repo_dir = dependencies_dir + repo + dir_str
+    print(dependencies_repo_dir)
 
     if os.path.isdir(dependencies_repo_dir):  # Delete the old dir
         shutil.rmtree(dependencies_repo_dir)
@@ -512,6 +513,18 @@ def dependencies_copy(repo, dir_str):
             shutil.rmtree(root + '/' + subdir)
 
 
+def get_repo_dir_from_docker_lib(repo, tags):
+    with open('official-images/library/'+repo, 'r') as f:
+        found = False
+        for line in f:
+            if line.startswith('Tags:'):
+                regex_ret = re.findall(r' '+tags+'[ \n,]', line)
+                if len(regex_ret) > 0:
+                    found = True
+            if found and line.startswith('Directory:'):
+                return re.findall(r'Directory: (.*)', line)[0]
+
+
 def get_repos_with_FROM(FROM):
     """
     Recursively go up the chain of turtles until an os image is found (no repo)
@@ -520,13 +533,14 @@ def get_repos_with_FROM(FROM):
     split_FROM = stripped_FROM.split(':')
 
     repo = split_FROM[0]
-    dirs = split_FROM[1].split('-')
+    tags = split_FROM[1]
+    dirs = tags.split('-')
     # Make a string to find the correct directory
     dir_str = ''
     version = ''
-    for dir in dirs:
-        version += '_'+dir
-        dir_str += '/'+dir
+    for _dir in dirs:
+        version += '_' + _dir
+        dir_str += '/' + _dir
 
     # Check if dir exists
     link = 'https://github.com/docker-library/' + repo + '.git'
@@ -544,11 +558,11 @@ def get_repos_with_FROM(FROM):
     # clone the repo
     subprocess_call(['git', 'clone', link], stdout=PIPE, stderr=PIPE)
 
+    dir_str = '/' + get_repo_dir_from_docker_lib(repo, tags)
     dependencies_copy(repo, dir_str)
 
     # instantiate a new Docker object
     docker_file = repo + dir_str + '/Dockerfile'
-    dir_str = dependencies_dir + repo + dir_str
     docker_files.append(Docker(docker_file, dir_str))
 
     # recursively call on next FROM statement
@@ -587,6 +601,7 @@ def remove_all_repos():
     """
     for repo in repos:
         shutil.rmtree(repo)
+    shutil.rmtree('official-images')
 
 
 """------------------------------------MAIN-----------------------------"""
@@ -642,6 +657,10 @@ def main():
         print('File "' + input_file + '" does not exist. Exiting...')
         exit()
 
+    # Clone the official-images library
+    link = 'https://github.com/docker-library/official-images.git'
+    subprocess_call(['git', 'clone', link], stdout=PIPE, stderr=PIPE)
+
     # Recursively get all the repos from FROM statements
     get_repos_with_FROM(docker_files[0].FROM)
 
@@ -662,19 +681,19 @@ def main():
             repo_tasks.append(repo_task)
             file_name = 'roles/' + repo_task + '/tasks/main'
 
-            ansible_file.write_to_file(file_name)
+        ansible_file.write_to_file(file_name)
 
-            # Want roles above this line to run in reverse order
-            repo_tasks.reverse()
+    # Want roles above this line to run in reverse order
+    repo_tasks.reverse()
 
-            # Make the site file
-            make_ansible_role_file(repo_tasks)
+    # Make the site file
+    make_ansible_role_file(repo_tasks)
 
-            # Generates the ansible.cfg file for ssh timeout
-            make_ansible_config_file()
+    # Generates the ansible.cfg file for ssh timeout
+    make_ansible_config_file()
 
-            # Get rid of all the cloned git repos
-            remove_all_repos()
+    # Get rid of all the cloned git repos
+    remove_all_repos()
 
     # print ansible command to run the generated code
     print('ansible-playbook site.yml -u <user> -i <host>,')
