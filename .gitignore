@@ -5,4 +5,4 @@ UnDock_Dependencies/
 roles/
 *.cfg
 *.egg-info/
-*__pycache__*
+*.pyc
