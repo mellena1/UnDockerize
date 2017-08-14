@@ -4,3 +4,4 @@ UnDock_Dependencies/
 *.retry
 roles/
 *.cfg
+*.egg-info/
