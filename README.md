@@ -1,8 +1,15 @@
 # UnDockerize
 A Python script to convert a Dockerfile to an Ansible-Playbook
 
-# Requirements
+## Requirements
 * Python 3
+
+## Install
+cd into the main directory of this repo, and then run:
+
+    pip install -e .
+
+*Note:* Make sure you use your Python3 version of pip. This means your command could be `pip3` instead of `pip`.
 
 ## Usage
 `UnDockerize.py [-h] [-i <input_file>] [-o <output_role>] [-c] [-n]`</br></br>
