@@ -256,7 +256,7 @@ class Docker:
         cmd.append('    mode: 0744')
         cmd.append('  with_fileglob:')
         for src in srcs:  # add all sources to fileglob
-            if not os.path.isfile(src):
+            if not os.path.exists(src):
                 src = self.dir_str + '/' + src
                 if not os.path.isfile(src):
                     print('WARNING: Possible copy issue with file:' + src)
