@@ -3,7 +3,6 @@ from os import path
 
 
 here = path.abspath(path.dirname(__file__))
-print(here)
 
 setup(
     name='UnDockerize',
